@@ -1,6 +1,8 @@
 #ifndef __DEVICE_DATA_H__
 #define __DEVICE_DATA_H__
 
+#include <vector>
+
 enum DeviceDataType
 {
 	Point = 0x00,
@@ -33,5 +35,34 @@ typedef struct
 }DeviceDataInfo;
 
 typedef DeviceDataInfo* DeviceDataInfoPtr;
+
+
+class DeviceDataRequester
+{
+public:
+
+	virtual ~DeviceDataRequester() {}
+
+	virtual std::vector<DeviceDataInfoPtr> getRequestedDeviceDataInfoPtrList()
+	{
+		return list;
+	}
+
+	virtual DeviceDataInfoPtr addDeviceDataRequest(DeviceDataParams params)
+	{
+		DeviceDataInfo ddi;
+		ddi.params = params;
+
+		DeviceDataInfoPtr ptr = &ddi;
+		list.push_back(ptr);
+
+		return ptr;
+	}
+
+
+private:
+	std::vector<DeviceDataInfoPtr> list;
+};
+
 
 #endif /* __DEVICE_DATA_H__ */

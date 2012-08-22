@@ -12,7 +12,7 @@
 #include "device_data.h"
 #include <vector>
 
-class Manipulator : public Module
+class Manipulator : public Module, public DeviceDataRequester
 {
 
 public:
@@ -31,6 +31,9 @@ public:
 	{
 		return dInfoPtr->ptr;
 	}
+
+	//TODO:
+	virtual void addTarget() = 0;
 
 protected:
 	std::vector<DeviceDataInfoPtr> sourceList;
