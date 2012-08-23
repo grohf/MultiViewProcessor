@@ -16,13 +16,32 @@ enum DeviceDataType
 	WarpIndice = 0x13
 };
 
+enum ElementType
+{
+	UCHAR1 	= 0x01,
+	UCHAR2 	= 0x02,
+	UCHAR3 	= 0x03,
+	UCHAR4 	= 0x04,
+
+	UINT1 	= 0x21,
+	UINT2 	= 0x22,
+	UINT3 	= 0x23,
+	UINT4 	= 0x24,
+
+	FLOAT1 	= 0x31,
+	FLOAT2 	= 0x32,
+	FLOAT3 	= 0x33,
+	FLOAT4 	= 0x34,
+};
+
 typedef struct
 {
 	unsigned int elements;
 	unsigned int element_size;
 	unsigned int capacity;
 
-	DeviceDataType type;
+	DeviceDataType dataType;
+	ElementType elementType;
 }DeviceDataParams;
 
 

@@ -10,9 +10,12 @@
 
 #include <module.h>
 #include <device_data.h>
+#include <vector>
 
 class Source : public Module, public DeviceDataRequester
 {
+public:
+
 	enum Status
 	{
 		Realized = 0
@@ -22,7 +25,13 @@ class Source : public Module, public DeviceDataRequester
 
 	/* Timebase */
 
+	virtual void addTargetData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
+	{
+		targetList[idx] = dInfoPtr;
+	}
 
+protected:
+	std::vector<DeviceDataInfoPtr> targetList;
 };
 
 
