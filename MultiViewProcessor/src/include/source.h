@@ -12,7 +12,7 @@
 #include <device_data.h>
 #include <vector>
 
-class Source : public Module, public DeviceDataRequester
+class Source : public Module, public DeviceDataRequester, public TargetLister
 {
 public:
 
@@ -25,13 +25,17 @@ public:
 
 	/* Timebase */
 
-	virtual void addTargetData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
+
+	virtual void init() = 0;
+
+	void execute()
 	{
-		targetList[idx] = dInfoPtr;
+		loadFrame();
 	}
 
-protected:
-	std::vector<DeviceDataInfoPtr> targetList;
+	virtual void loadFrame() = 0;
+
+
 };
 
 

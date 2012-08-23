@@ -12,7 +12,7 @@
 #include "device_data.h"
 #include <vector>
 
-class Manipulator : public Module, public DeviceDataRequester
+class Manipulator : public Module, public DeviceDataRequester, public SourceLister, public TargetLister
 {
 
 public:
@@ -22,22 +22,22 @@ public:
 
 	virtual void execute() = 0;
 
-	virtual void addSourceData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
-	{
-		sourceList[idx] = dInfoPtr;
-	}
-
-	virtual DeviceDataPtr getDeviceDataPointer(DeviceDataInfoPtr dInfoPtr)
-	{
-		return dInfoPtr->ptr;
-	}
-
-	//TODO:
-	virtual void addTarget() = 0;
+//	virtual void addSourceData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
+//	{
+//		sourceList[idx] = dInfoPtr;
+//	}
+//
+//	virtual DeviceDataPtr getDeviceDataPointer(DeviceDataInfoPtr dInfoPtr)
+//	{
+//		return dInfoPtr->ptr;
+//	}
+//
+//	//TODO:
+//	virtual void addTarget() = 0;
 
 protected:
-	std::vector<DeviceDataInfoPtr> sourceList;
-	std::vector<DeviceDataInfoPtr> targetList;
+//	std::vector<DeviceDataInfoPtr> sourceList;
+//	std::vector<DeviceDataInfoPtr> targetList;
 };
 
 

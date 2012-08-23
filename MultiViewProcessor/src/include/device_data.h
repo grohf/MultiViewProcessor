@@ -34,6 +34,9 @@ enum ElementType
 	FLOAT4 	= 0x34,
 };
 
+//template<typename T>
+//void test(T value);
+
 typedef struct
 {
 	unsigned int elements;
@@ -77,6 +80,7 @@ public:
 
 		return ptr;
 	}
+
 
 
 private:

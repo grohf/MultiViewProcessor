@@ -31,12 +31,18 @@
 								<option id="nvcc.compiler.pic.1947788849" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
 								<option id="nvcc.compiler.include.paths.709076602" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/MultiViewProcessor/src/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 								</option>
 								<inputType id="nvcc.compiler.input.cu.1126651958" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1591562129" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.993397056" superClass="nvcc.compiler.input.c"/>
 							</tool>
 							<tool id="nvcc.linker.base.1089817992" name="NVCC Linker" superClass="nvcc.linker.base">
+								<option id="nvcc.linker.option.libs.880590786" name="Libraries (-l)" superClass="nvcc.linker.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="freenect_sync"/>
+									<listOptionValue builtIn="false" value="freenect"/>
+								</option>
 								<inputType id="nvcc.linker.input.1718933632" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -89,12 +95,18 @@
 								<option id="nvcc.compiler.pic.1210926291" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
 								<option id="nvcc.compiler.include.paths.2025243601" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/MultiViewProcessor/src/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 								</option>
 								<inputType id="nvcc.compiler.input.cu.279360062" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.656687760" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.1446234031" superClass="nvcc.compiler.input.c"/>
 							</tool>
 							<tool id="nvcc.linker.base.1232770196" name="NVCC Linker" superClass="nvcc.linker.base">
+								<option id="nvcc.linker.option.libs.486180969" name="Libraries (-l)" superClass="nvcc.linker.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="freenect_sync"/>
+									<listOptionValue builtIn="false" value="freenect"/>
+								</option>
 								<inputType id="nvcc.linker.input.760090362" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>

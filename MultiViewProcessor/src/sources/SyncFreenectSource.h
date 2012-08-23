@@ -10,6 +10,7 @@
 
 #include <source.h>
 #include <vector_types.h>
+#include <stdint.h>
 
 class SyncFreenectSource : public Source
 {
@@ -25,10 +26,17 @@ public:
 	virtual ~SyncFreenectSource();
 
 	void init();
-	void execute();
+	void loadFrame();
+
+private:
+	void setRegInfo();
 
 private:
 	dim3 grid,block;
+
+	uint8_t *d_rgb;
+	uint16_t *d_depth;
 };
+
 
 #endif /* SYNCFREENECTSOURCE_H_ */
