@@ -17,7 +17,7 @@
  */
 int main(void) {
 
-	TestFilter *f = new TestFilter();
+//	TestFilter *f = new TestFilter();
 
 
 

@@ -9,6 +9,7 @@
 #define SYNCFREENECTSOURCE_H_
 
 #include <source.h>
+#include <vector_types.h>
 
 class SyncFreenectSource : public Source
 {
@@ -22,6 +23,9 @@ public:
 
 	SyncFreenectSource();
 	virtual ~SyncFreenectSource();
+
+	void init();
+	void execute();
 
 private:
 	dim3 grid,block;

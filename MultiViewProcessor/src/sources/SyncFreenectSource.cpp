@@ -6,6 +6,7 @@
  */
 
 #include "SyncFreenectSource.h"
+#include <vector_types.h>
 
 struct SyncFreenectLoader
 {
@@ -14,6 +15,12 @@ struct SyncFreenectLoader
 
 void
 SyncFreenectSource::init()
+{
+
+}
+
+void
+SyncFreenectSource::execute()
 {
 
 }
