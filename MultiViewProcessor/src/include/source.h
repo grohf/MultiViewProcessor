@@ -12,7 +12,7 @@
 #include <device_data.h>
 #include <vector>
 
-class Source : public Module, public DeviceDataRequester, public TargetLister
+class Source : public Module, public DeviceDataRequester, public TargetLister<>
 {
 public:
 
@@ -37,6 +37,7 @@ public:
 
 
 };
+typedef boost::shared_ptr<Source> SourcePtr;
 
 
 #endif /* SOURCE_H_ */

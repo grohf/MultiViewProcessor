@@ -9,78 +9,75 @@
 #define MODULE_H_
 
 #include <device_data.h>
+#include <boost/shared_ptr.hpp>
+
+#include <boost/container/map.hpp>
 #include <vector>
+#include <map>
 
 class Module {
 public:
+
 	virtual ~Module() {}
 
 	virtual void init() = 0;
 	virtual void execute() = 0;
 };
 
-//template<typename T>
-//class Lister
-//{
-//public:
-//	void addData(T data,unsigned int idx)
-//	{
-//		list[idx] = data;
-//	}
-//
-//
-//private:
-//	std::vector<T> list;
-//};
+typedef boost::shared_ptr<Module> ModulePtr;
 
+template<typename T = unsigned int>
 class SourceLister
 {
 public:
-	void addSourceData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
+	void addSourceData(DeviceDataInfoPtr dInfoPtr, T id)
 	{
-		list[idx] = dInfoPtr;
+		map[id] = dInfoPtr;
 	}
 protected:
-	DeviceDataInfoPtr getSourceData(unsigned int idx)
+	DeviceDataInfoPtr getSourceData(T id)
 	{
-		return list[idx];
+		return map[id];
 	}
 
-	DeviceDataPtr getSourceDataPointer(unsigned int idx)
+	DeviceDataPtr getSourceDataPointer(T id)
 	{
-		return list[idx]->ptr;
+		return map[id]->getDeviceDataPtr();
 	}
 
 private:
-	std::vector<DeviceDataInfoPtr> list;
+//	std::vector<DeviceDataInfoPtr> list;
+	std::map<T,DeviceDataInfoPtr> map;
 
 };
 
+template<typename T = unsigned int>
 class TargetLister
 {
 public:
-	DeviceDataInfoPtr getTargetData(unsigned int idx)
+	DeviceDataInfoPtr getTargetData(T id)
 	{
-		return list[idx];
+		return map[id];
 	}
 
 protected:
-	void addTargetData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
+	void addTargetData(DeviceDataInfoPtr dInfoPtr, T id)
 	{
-		if(list.size()<idx+1)
-			list.resize(idx+1);
+//		if(list.size()<idx+1)
+//			list.resize(idx+1);
 
-		list[idx] = dInfoPtr;
+		map[id] = dInfoPtr;
 	}
 
-	DeviceDataPtr getTargetDataPointer(unsigned int idx)
+	void* getTargetDataPointer(T id)
 	{
-		return list[idx]->ptr;
+		return map[id]->getDeviceDataPtr().get();
 	}
 
 
 private:
-	std::vector<DeviceDataInfoPtr> list;
+//	std::vector<DeviceDataInfoPtr> list;
+	std::map<T,DeviceDataInfoPtr> map;
 };
 
 #endif /* MODULE_H_ */

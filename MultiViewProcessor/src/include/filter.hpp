@@ -1,11 +1,11 @@
 #ifndef __FILTER_HPP__
 #define __FILTER_HPP__
 
-#include "manipulator.hpp"
+#include "enhancer.hpp"
 #include <device_data.h>
 
 
-class Filter : public Manipulator
+class Filter : public Enhancer
 {
 public:
 
@@ -15,5 +15,7 @@ public:
 protected:
 
 };
+
+typedef boost::shared_ptr<Filter> FilterPtr;
 
 #endif /* __FILTER_HPP__ */

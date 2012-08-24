@@ -28,6 +28,8 @@ public:
 	void init();
 	void loadFrame();
 
+//	void close();
+
 private:
 	void setRegInfo();
 

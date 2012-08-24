@@ -1,44 +1,34 @@
 /*
- * manipulator.h
+ * enhancer.h
  *
  *  Created on: Aug 22, 2012
  *      Author: avo
  */
 
-#ifndef MANIPULATOR_H_
-#define MANIPULATOR_H_
+#ifndef ENHANCER_H_
+#define ENHANCER_H_
 
 #include "module.h"
 #include "device_data.h"
 #include <vector>
+#include <boost/shared_ptr.hpp>
 
-class Manipulator : public Module, public DeviceDataRequester, public SourceLister, public TargetLister
+
+class Enhancer : public Module, public DeviceDataRequester, public SourceLister<>, public TargetLister<>
 {
 
 public:
-	virtual ~Manipulator() {}
+	virtual ~Enhancer() {}
 
 	virtual void init() = 0;
 
 	virtual void execute() = 0;
 
-//	virtual void addSourceData(DeviceDataInfoPtr dInfoPtr, unsigned int idx)
-//	{
-//		sourceList[idx] = dInfoPtr;
-//	}
-//
-//	virtual DeviceDataPtr getDeviceDataPointer(DeviceDataInfoPtr dInfoPtr)
-//	{
-//		return dInfoPtr->ptr;
-//	}
-//
-//	//TODO:
-//	virtual void addTarget() = 0;
-
 protected:
-//	std::vector<DeviceDataInfoPtr> sourceList;
-//	std::vector<DeviceDataInfoPtr> targetList;
+
 };
 
+typedef boost::shared_ptr<Enhancer> EnhancerPtr;
 
-#endif /* MANIPULATOR_H_ */
+
+#endif /* ENHANCER_H_ */

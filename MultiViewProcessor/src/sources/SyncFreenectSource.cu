@@ -129,7 +129,6 @@ SyncFreenectSource::SyncFreenectSource()
 	pointRGBAParams.elementType = UCHAR4;
 
 	addTargetData(addDeviceDataRequest(pointRGBAParams),PointRGBA);
-	printf("end \n");
 }
 
 void
@@ -176,6 +175,7 @@ SyncFreenectSource::setRegInfo()
 
 SyncFreenectSource::~SyncFreenectSource()
 {
-	// TODO Auto-generated destructor stub
+	freenect_sync_stop();
+	printf("sync freenect stopped \n");
 }
 

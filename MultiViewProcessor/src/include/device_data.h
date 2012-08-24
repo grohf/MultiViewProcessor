@@ -2,6 +2,8 @@
 #define __DEVICE_DATA_H__
 
 #include <vector>
+#include <boost/shared_ptr.hpp>
+#include <boost/container/vector.hpp>
 
 enum DeviceDataType
 {
@@ -48,34 +50,52 @@ typedef struct
 }DeviceDataParams;
 
 
-typedef void* DeviceDataPtr;
+typedef boost::shared_ptr<void> DeviceDataPtr;
 
-typedef struct
+
+class DeviceDataInfo
 {
 	DeviceDataPtr ptr;
 	DeviceDataParams params;
-}DeviceDataInfo;
 
-typedef DeviceDataInfo* DeviceDataInfoPtr;
+public:
+	DeviceDataInfo(DeviceDataParams params_)
+	{
+		params = params_;
+	}
+
+	DeviceDataPtr getDeviceDataPtr() const
+	{
+		return ptr;
+	}
+
+	DeviceDataParams getDeviceDataParams() const
+	{
+		return params;
+	}
+
+};
+
+typedef boost::shared_ptr<DeviceDataInfo> DeviceDataInfoPtr;
 
 
 class DeviceDataRequester
 {
 public:
 
-	virtual ~DeviceDataRequester() {}
+	~DeviceDataRequester() {}
 
-	virtual std::vector<DeviceDataInfoPtr> getRequestedDeviceDataInfoPtrList()
+	std::vector<DeviceDataInfoPtr> getRequestedDeviceDataInfoPtrList()
 	{
 		return list;
 	}
 
-	virtual DeviceDataInfoPtr addDeviceDataRequest(DeviceDataParams params)
+	DeviceDataInfoPtr addDeviceDataRequest(DeviceDataParams params)
 	{
-		DeviceDataInfo ddi;
-		ddi.params = params;
 
-		DeviceDataInfoPtr ptr = &ddi;
+		DeviceDataInfo *ddi = new DeviceDataInfo(params);
+		DeviceDataInfoPtr ptr(ddi);
+
 		list.push_back(ptr);
 
 		return ptr;

@@ -8,11 +8,11 @@
 #ifndef FEATURE_HPP_
 #define FEATURE_HPP_
 
-#include "manipulator.hpp"
+#include "enhancer.hpp"
 #include <device_data.h>
 #include <vector>
 
-class Feature : public Manipulator
+class Feature : public Enhancer
 {
 public:
 	void setTargetDeviceDataParams(DeviceDataParams params)

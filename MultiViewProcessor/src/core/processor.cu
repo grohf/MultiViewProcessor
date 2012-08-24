@@ -22,24 +22,33 @@ Processor::Processor()
 }
 
 void
-Processor::addSource(Source& src)
+Processor::setSource(Source& src_)
 {
 	printf("addSource() \n");
-	std::vector<DeviceDataInfoPtr> qryList = src.getRequestedDeviceDataInfoPtrList();
-	printf("qryList size: %d \n",qryList.size());
+	std::vector<DeviceDataInfoPtr> qryList = src_.getRequestedDeviceDataInfoPtrList();
+//	printf("qryList size: %d \n",qryList.size());
+//
+//	int i1 = qryList[0]->getDeviceDataParams().element_size;
+//	int i2 = qryList[1]->getDeviceDataParams().element_size;
 
+//	printf("%d %d \n",i1,i2);
 
-	std::vector<DeviceDataInfoPtr> qryList2(1);
+	allocateDeviceMemory(qryList);
 
-	DeviceDataInfo ddi;
-	DeviceDataParams params;
-	params.elements = 2;
-	params.element_size = 1;
-	ddi.params = params;
+}
 
-	qryList2[0] = &ddi;
+void Processor::addFilter(Filter& filter)
+{
+	Enhancer *enh = &filter;
+	EnhancerPtr ePtr(enh);
+	enhancerPtrList.push_back(ePtr);
+}
 
-	allocateDeviceMemory(qryList2);
-
+void Processor::start()
+{
+	for(int i=0;i<enhancerPtrList.size();i++)
+	{
+		enhancerPtrList[i]->execute();
+	}
 }
 

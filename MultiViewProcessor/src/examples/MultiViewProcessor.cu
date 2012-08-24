@@ -33,12 +33,21 @@ int main(int argc, char **argv) {
 
 //	findCudaGLDevice(argc,(const char**)argv);
 
-//	findCudaDevice(argc,(const char**)argv);
+	findCudaDevice(argc,(const char**)argv);
 
-	SyncFreenectSource src;
+//	SyncFreenectSource src;
+
+	SourcePtr src(new SyncFreenectSource());
 
 	Processor p;
-	p.addSource(src);
+	p.setSource(src);
+
+	FilterPtr f(new TestFilter());
+//	TestFilter *f = new TestFilter();
+
+	p.addFilter(f);
+
+	p.start();
 
 	return 0;
 }

@@ -6,7 +6,7 @@
  */
 
 #include "TestFilter.h"
-
+#include <stdio.h>
 
 void TestFilter::init()
 {
@@ -16,5 +16,5 @@ void TestFilter::init()
 
 void TestFilter::execute()
 {
-
+	printf("TestFilter execute()");
 }
