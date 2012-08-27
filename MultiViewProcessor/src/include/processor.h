@@ -38,7 +38,6 @@ public:
 
 //	void setSource(Source& source);
 	void addFilter(Filter& filter);
-	void addFeature(Feature& feature);
 	void addEnhancer(Enhancer& enh);
 
 	void start();
@@ -55,6 +54,19 @@ public:
 		enhancerPtrList.push_back(ePtr);
 
 		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
+	}
+
+	void addFeature(FeaturePtr featurePtr)
+	{
+		EnhancerPtr ePtr = featurePtr;
+		enhancerPtrList.push_back(ePtr);
+
+		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
+	}
+
+	void addFeature(Feature *feature)
+	{
+		addFeature(feature->getFeaturePtr());
 	}
 
 private:

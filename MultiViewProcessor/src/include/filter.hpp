@@ -9,11 +9,26 @@
 
 typedef boost::function1<void ,DeviceDataParams&> DeviceDataParamFunction;
 
+class Filter;
+typedef boost::shared_ptr<Filter> FilterPtr;
+
 class Filter : public Enhancer
 {
 std::map<unsigned int,DeviceDataParamFunction> paramChangeMap;
 
 public:
+
+	FilterPtr fptr;
+
+	Filter()
+	{
+		fptr.reset(this);
+	}
+
+//	FilterPtr operator=(Filter const *f)
+//	{
+//		return ptr;
+//	}
 
 	virtual void init() = 0;
 	virtual void execute() = 0;
@@ -45,7 +60,6 @@ protected:
 
 };
 
-typedef boost::shared_ptr<Filter> FilterPtr;
 
 
 #endif /* __FILTER_HPP__ */

@@ -19,16 +19,19 @@
 #include <helper_cuda.h>
 #include <helper_image.h>
 
+#include "../sink/pcd_io.h"
+
 namespace device
 {
 	namespace constant
 	{
-	__constant__ double ref_pix_size;
-	__constant__ double ref_dist;
+		__constant__ double ref_pix_size;
+		__constant__ double ref_dist;
 	}
 
 	struct SyncFreenectLoader
 	{
+
 		uint8_t *rgb;
 		uint16_t *depth;
 
@@ -39,7 +42,10 @@ namespace device
 		convertCXCYWZtoWXWYWZ(int cx,int cy, int wz, float &wx, float &wy) const
 		{
 
-			double factor = (2*constant::ref_pix_size * wz) / constant::ref_dist;
+			double factor = (2*constant::ref_pix_size * wz)  / constant::ref_dist;
+
+//			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
+//				printf("factor: %f ref_pix_size: %f ref_dist: %f \n",factor,constant::ref_pix_size,constant::ref_dist);
 
 			wx = (float) ((cx - 320) * factor);
 			wy = (float) ((cy - 240) * factor);
@@ -92,7 +98,7 @@ SyncFreenectSource::init()
 //
 //	printf("pointer after: %d \n",d_test_xyzi);
 
-	setRegInfo();
+//	setRegInfo();
 
 	loader.rgb = d_rgb;
 	loader.depth = d_depth;
@@ -100,10 +106,14 @@ SyncFreenectSource::init()
 	loader.xyzi = (float4 *)getTargetDataPointer(PointXYZI);
 	loader.rgba = (uchar4 *)getTargetDataPointer(PointRGBA);
 
-	printf("pointer xyzi: %d \n",loader.xyzi);
+//	printf("pointer xyzi: %d \n",loader.xyzi);
 
 	block = dim3(32,24);
 	grid = dim3(640/block.x,480/block.y);
+
+	cudaMemcpyToSymbol(device::constant::ref_pix_size,&ref_pix_size,sizeof(double));
+	cudaMemcpyToSymbol(device::constant::ref_dist,&ref_dist,sizeof(double));
+
 }
 
 void
@@ -120,6 +130,8 @@ SyncFreenectSource::loadFrame()
 	checkCudaErrors(cudaMemcpy(d_rgb,h_rgb,640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
 	checkCudaErrors(cudaMemcpy(d_depth,h_depth,640*480*sizeof(uint16_t),cudaMemcpyHostToDevice));
 
+//	printf("pointer rgb: %d \n",loader.rgb);
+//	printf("pointer xyzi: %d \n",loader.xyzi);
 
 	device::loadSyncFreenectFrame<<<grid,block>>>(loader);
 	checkCudaErrors(cudaGetLastError());
@@ -127,13 +139,32 @@ SyncFreenectSource::loadFrame()
 
 	/* TEST */
 
-	size_t uc4s = 640*480*sizeof(uchar4);
-	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
-	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
+//	size_t uc4s = 640*480*sizeof(uchar4);
+////	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
+////	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
+////
+//	char path[50];
+////	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
+////	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
+////
+//	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+//	checkCudaErrors(cudaMemcpy(h_f4_depth,loader.xyzi,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+//
+//	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
+//	for(int i=0;i<640*480;i++)
+//	{
+//		unsigned char g = h_f4_depth[i].z/20;
+//		h_uc4_depth[i] = make_uchar4(g,g,g,128);
+//	}
+//
+//	sprintf(path,"/home/avo/pcds/src_depth%d.ppm",0);
+//	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
+//
+//	sprintf(path,"/home/avo/pcds/src_wc_points%d.pcd",0);
+//	host::io::PCDIOController pcdIOCtrl;
+//	pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
 
-	char path[50];
-	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
-	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
+
 
 	printf("loaded! \n");
 }
@@ -156,6 +187,8 @@ SyncFreenectSource::SyncFreenectSource()
 	pointRGBAParams.elementType = UCHAR4;
 
 	addTargetData(addDeviceDataRequest(pointRGBAParams),PointRGBA);
+
+	setRegInfo();
 }
 
 void
@@ -192,10 +225,15 @@ SyncFreenectSource::setRegInfo()
 
 	freenect_registration reg = freenect_copy_registration(f_dev);
 
-	printf("pix_size: %f | dist: %f \n",reg.zero_plane_info.reference_pixel_size,reg.zero_plane_info.reference_distance);
+//	printf("pix_size: %f | dist: %f \n",reg.zero_plane_info.reference_pixel_size,reg.zero_plane_info.reference_distance);
 
-	cudaMemcpyToSymbol(device::constant::ref_pix_size,&reg.zero_plane_info.reference_pixel_size,sizeof(double));
-	cudaMemcpyToSymbol(device::constant::ref_dist,&reg.zero_plane_info.reference_distance,sizeof(double));
+//	cudaMemcpyToSymbol(device::constant::ref_pix_size,&(reg.zero_plane_info.reference_pixel_size),sizeof(double));
+//	cudaMemcpyToSymbol(device::constant::ref_dist,&(reg.zero_plane_info.reference_distance),sizeof(double));
+
+	ref_pix_size = reg.zero_plane_info.reference_pixel_size;
+	ref_dist = reg.zero_plane_info.reference_distance;
+
+	printf("pix_size: %f | dist: %f \n",ref_pix_size,ref_dist);
 
 	freenect_close_device(f_dev);
 }

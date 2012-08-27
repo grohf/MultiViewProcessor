@@ -25,6 +25,7 @@
 #include "../filter/TestFilter.h"
 #include "../filter/TestFilter2.h"
 #include "../filter/ATrousFilter.h"
+#include "../feature/NormalPCAEstimator.h"
 
 /**
  * Host function that prepares data array and passes it to the CUDA kernel.
@@ -32,21 +33,29 @@
 int main(int argc, char **argv) {
 
 
-	SourcePtr src(new SyncFreenectSource());
+	SyncFreenectSource *src = new SyncFreenectSource();
+//	SourcePtr src(new SyncFreenectSource());
 
 	Processor p;
-	p.setSource(src);
+	p.setSource(SourcePtr(src));
 
-
-//	FilterPtr atrousfilter(new ATrousFilter());
-//	atrousfilter->addFilterInput(src->getTargetData(SyncFreenectSource::PointXYZI));
 
 	ATrousFilter *atrousfilter = new ATrousFilter();
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 
 	p.addFilter(FilterPtr(atrousfilter));
 
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator();
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+//	nPCAestimator->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
+	p.addFeature(nPCAestimator);
+
+//	FilterPtr fp = atrousfilter->ptr;
+
 	p.start();
+
+	src->~SyncFreenectSource();
+
 
 	return 0;
 }

@@ -41,6 +41,9 @@ private:
 
 	float4 *d_test_xyzi;
 	uchar4 *d_test_rgba;
+
+	double ref_pix_size;
+	double ref_dist;
 };
 
 

@@ -17,10 +17,8 @@ class ATrousFilter : public Filter {
 	dim3 block;
 	unsigned int radi;
 
-//	struct device
-//	{
-//
-//	};
+	unsigned int atrous_radi;
+	unsigned int atrous_length;
 
 public:
 	ATrousFilter(unsigned int radi_=2) {
@@ -36,6 +34,11 @@ public:
 	void setInput2DPointCloud(DeviceDataInfoPtr ddiPtr)
 	{
 		addFilterInput(ddiPtr,0);
+	}
+
+	DeviceDataInfoPtr getFilteredWorldCoordinates()
+	{
+		return getTargetData(0);
 	}
 
 private:

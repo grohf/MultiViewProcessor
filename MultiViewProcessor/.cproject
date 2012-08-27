@@ -34,7 +34,8 @@
 									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 								</option>
-								<option id="nvcc.compiler.maxregcount.1601824716" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
+								<option id="nvcc.compiler.maxregcount.1601824716" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
+								<option id="nvcc.compiler.usefastmath.1211152740" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
 								<inputType id="nvcc.compiler.input.cu.1126651958" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1591562129" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.993397056" superClass="nvcc.compiler.input.c"/>
@@ -65,6 +66,7 @@
 					<sass major="2" minor="0"/>
 					<ptx major="2" minor="0"/>
 				</executable>
+				<editor-arch major="2" minor="0"/>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 		</cconfiguration>
@@ -136,6 +138,8 @@
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="MultiViewProcessor.com.nvidia.cuda.ide.exe.1047120279" name="Executable" projectType="com.nvidia.cuda.ide.exe"/>
 	</storageModule>
+	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.cu.1126651958">
@@ -147,15 +151,14 @@
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.c.1446234031">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cu.279360062">
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.cpp.1591562129">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.cpp.1591562129">
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cu.279360062">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.c.993397056">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="refreshScope"/>
 </cproject>
