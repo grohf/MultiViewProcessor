@@ -17,6 +17,7 @@
 
 //TODO: get deviceMemory stuff out here
 #include <helper_cuda.h>
+#include <helper_image.h>
 
 namespace device
 {
@@ -67,6 +68,9 @@ namespace device
 			float4 f4 = make_float4(wx,wy,wz,((r+r+r+b+g+g+g+g)>>3));
 			xyzi[z*640*480+y*640+x] = f4;
 
+			uchar4 uc4 = make_uchar4(r,g,b,128);
+			rgba[z*640*480+y*640+x] = uc4;
+
 		}
 
 	};
@@ -81,6 +85,13 @@ SyncFreenectSource::init()
 	checkCudaErrors(cudaMalloc((void**)&d_rgb,640*480*3*sizeof(uint8_t)));
 	checkCudaErrors(cudaMalloc((void**)&d_depth,640*480*sizeof(uint16_t)));
 
+//	printf("pointer before: %d \n",d_test_xyzi);
+//
+//	checkCudaErrors(cudaMalloc((void**)&d_test_xyzi,640*480*sizeof(float4)));
+//	checkCudaErrors(cudaMalloc((void**)&d_test_rgba,640*480*sizeof(uchar4)));
+//
+//	printf("pointer after: %d \n",d_test_xyzi);
+
 	setRegInfo();
 
 	loader.rgb = d_rgb;
@@ -89,13 +100,16 @@ SyncFreenectSource::init()
 	loader.xyzi = (float4 *)getTargetDataPointer(PointXYZI);
 	loader.rgba = (uchar4 *)getTargetDataPointer(PointRGBA);
 
+	printf("pointer xyzi: %d \n",loader.xyzi);
+
 	block = dim3(32,24);
-	grid = dim3(block.x/640,block.y/320);
+	grid = dim3(640/block.x,480/block.y);
 }
 
 void
 SyncFreenectSource::loadFrame()
 {
+
 	uint16_t *h_depth = 0;
 	uint8_t *h_rgb = 0;
 	uint32_t ts;
@@ -106,9 +120,22 @@ SyncFreenectSource::loadFrame()
 	checkCudaErrors(cudaMemcpy(d_rgb,h_rgb,640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
 	checkCudaErrors(cudaMemcpy(d_depth,h_depth,640*480*sizeof(uint16_t),cudaMemcpyHostToDevice));
 
+
 	device::loadSyncFreenectFrame<<<grid,block>>>(loader);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+	/* TEST */
+
+	size_t uc4s = 640*480*sizeof(uchar4);
+	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
+	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
+
+	char path[50];
+	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
+	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
+
+	printf("loaded! \n");
 }
 
 SyncFreenectSource::SyncFreenectSource()

@@ -23,29 +23,28 @@
 
 #include "../sources/SyncFreenectSource.h"
 #include "../filter/TestFilter.h"
+#include "../filter/TestFilter2.h"
+#include "../filter/ATrousFilter.h"
 
 /**
  * Host function that prepares data array and passes it to the CUDA kernel.
  */
 int main(int argc, char **argv) {
 
-//	TestFilter *f = new TestFilter();
-
-//	findCudaGLDevice(argc,(const char**)argv);
-
-	findCudaDevice(argc,(const char**)argv);
-
-//	SyncFreenectSource src;
 
 	SourcePtr src(new SyncFreenectSource());
 
 	Processor p;
 	p.setSource(src);
 
-	FilterPtr f(new TestFilter());
-//	TestFilter *f = new TestFilter();
 
-	p.addFilter(f);
+//	FilterPtr atrousfilter(new ATrousFilter());
+//	atrousfilter->addFilterInput(src->getTargetData(SyncFreenectSource::PointXYZI));
+
+	ATrousFilter *atrousfilter = new ATrousFilter();
+	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
+
+	p.addFilter(FilterPtr(atrousfilter));
 
 	p.start();
 

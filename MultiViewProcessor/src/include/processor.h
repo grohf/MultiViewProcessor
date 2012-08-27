@@ -29,40 +29,56 @@ class Processor
 SourcePtr srcPtr;
 std::vector<EnhancerPtr> enhancerPtrList;
 
+
+std::vector<DeviceDataInfoPtr> memList;
+
 public:
 
 	Processor();
 
-	void setSource(Source& source);
+//	void setSource(Source& source);
 	void addFilter(Filter& filter);
 	void addFeature(Feature& feature);
 	void addEnhancer(Enhancer& enh);
 
 	void start();
 
-	void setSource(SourcePtr srcPtr)
+	void setSource(SourcePtr srcPtr_)
 	{
-		allocateDeviceMemory(srcPtr->getRequestedDeviceDataInfoPtrList());
+		srcPtr = srcPtr_;
+		addRequestedDeviceData(srcPtr->getRequestedDeviceDataInfoPtrList());
 	}
 
 	void addFilter(FilterPtr filterPtr)
 	{
 		EnhancerPtr ePtr = filterPtr;
 		enhancerPtrList.push_back(ePtr);
+
+		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
 	}
 
 private:
-	void allocateDeviceMemory(std::vector<DeviceDataInfoPtr> list)
+
+	void addRequestedDeviceData(std::vector<DeviceDataInfoPtr> list)
 	{
 		for(int i=0;i<list.size();i++)
+			memList.push_back(list[i]);
+	}
+
+	void allocateDeviceMemory()
+	{
+		for(int i=0;i<memList.size();i++)
 		{
-			DeviceDataInfoPtr ddip = list[i];
+			DeviceDataInfoPtr ddip = memList[i];
 			DeviceDataParams params = ddip->getDeviceDataParams();
 			printf("i:%d | %d | %d \n",i,params.elements,params.element_size);
 
-			void* d = ddip->getDeviceDataPtr().get();
+			void* d;
 
 			checkCudaErrors(cudaMalloc((void**)&d,params.elements*params.element_size));
+
+			ddip->setDeviceDataPtr(DeviceDataPtr(d));
+
 
 			printf("allocated DeviceDataType: %d \n",params.dataType);
 		}

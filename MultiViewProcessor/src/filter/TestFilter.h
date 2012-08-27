@@ -16,6 +16,11 @@ class TestFilter : public Filter {
 
 public:
 
+	enum Target
+	{
+		PointXYZ,
+	};
+
 //	boost::shared_ptr<TestFilter> Ptr;
 //
 //	TestFilter()

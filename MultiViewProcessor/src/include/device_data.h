@@ -52,11 +52,18 @@ typedef struct
 
 typedef boost::shared_ptr<void> DeviceDataPtr;
 
-
+class Processor;
 class DeviceDataInfo
 {
+	friend class Processor;
+
 	DeviceDataPtr ptr;
 	DeviceDataParams params;
+
+	void setDeviceDataPtr(DeviceDataPtr d_ptr)
+	{
+		ptr = d_ptr;
+	}
 
 public:
 	DeviceDataInfo(DeviceDataParams params_)

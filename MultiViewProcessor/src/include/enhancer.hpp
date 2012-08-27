@@ -14,7 +14,7 @@
 #include <boost/shared_ptr.hpp>
 
 
-class Enhancer : public Module, public DeviceDataRequester, public SourceLister<>, public TargetLister<>
+class Enhancer : public Module, public DeviceDataRequester, public InputLister<>, public TargetLister<>
 {
 
 public:

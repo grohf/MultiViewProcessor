@@ -38,6 +38,9 @@ private:
 
 	uint8_t *d_rgb;
 	uint16_t *d_depth;
+
+	float4 *d_test_xyzi;
+	uchar4 *d_test_rgba;
 };
 
 

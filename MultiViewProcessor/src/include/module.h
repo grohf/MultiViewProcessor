@@ -11,6 +11,7 @@
 #include <device_data.h>
 #include <boost/shared_ptr.hpp>
 
+#include <vector_types.h>
 #include <boost/container/map.hpp>
 #include <vector>
 #include <map>
@@ -27,22 +28,22 @@ public:
 typedef boost::shared_ptr<Module> ModulePtr;
 
 template<typename T = unsigned int>
-class SourceLister
+class InputLister
 {
 public:
-	void addSourceData(DeviceDataInfoPtr dInfoPtr, T id)
+	void addInputData(DeviceDataInfoPtr dInfoPtr, T id)
 	{
 		map[id] = dInfoPtr;
 	}
 protected:
-	DeviceDataInfoPtr getSourceData(T id)
+	DeviceDataInfoPtr getInputData(T id)
 	{
 		return map[id];
 	}
 
-	DeviceDataPtr getSourceDataPointer(T id)
+	void* getInputDataPointer(T id)
 	{
-		return map[id]->getDeviceDataPtr();
+		return map[id]->getDeviceDataPtr().get();
 	}
 
 private:
@@ -63,9 +64,6 @@ public:
 protected:
 	void addTargetData(DeviceDataInfoPtr dInfoPtr, T id)
 	{
-//		if(list.size()<idx+1)
-//			list.resize(idx+1);
-
 		map[id] = dInfoPtr;
 	}
 

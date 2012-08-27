@@ -21,21 +21,6 @@ Processor::Processor()
 
 }
 
-void
-Processor::setSource(Source& src_)
-{
-	printf("addSource() \n");
-	std::vector<DeviceDataInfoPtr> qryList = src_.getRequestedDeviceDataInfoPtrList();
-//	printf("qryList size: %d \n",qryList.size());
-//
-//	int i1 = qryList[0]->getDeviceDataParams().element_size;
-//	int i2 = qryList[1]->getDeviceDataParams().element_size;
-
-//	printf("%d %d \n",i1,i2);
-
-	allocateDeviceMemory(qryList);
-
-}
 
 void Processor::addFilter(Filter& filter)
 {
@@ -46,6 +31,19 @@ void Processor::addFilter(Filter& filter)
 
 void Processor::start()
 {
+	findCudaDevice(0,(const char**)"");
+
+	allocateDeviceMemory();
+
+	/* INITS */
+	srcPtr->init();
+	for(int i=0;i<enhancerPtrList.size();i++)
+	{
+		enhancerPtrList[i]->init();
+	}
+
+	/* EXECUTES */
+	srcPtr->execute();
 	for(int i=0;i<enhancerPtrList.size();i++)
 	{
 		enhancerPtrList[i]->execute();

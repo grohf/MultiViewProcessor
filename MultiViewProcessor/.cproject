@@ -34,6 +34,7 @@
 									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 								</option>
+								<option id="nvcc.compiler.maxregcount.1601824716" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
 								<inputType id="nvcc.compiler.input.cu.1126651958" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1591562129" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.993397056" superClass="nvcc.compiler.input.c"/>
@@ -156,4 +157,5 @@
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
+	<storageModule moduleId="refreshScope"/>
 </cproject>
