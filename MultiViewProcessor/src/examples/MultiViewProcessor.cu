@@ -26,6 +26,7 @@
 #include "../filter/TestFilter2.h"
 #include "../filter/ATrousFilter.h"
 #include "../feature/NormalPCAEstimator.h"
+#include "../feature/FPFH.h"
 
 /**
  * Host function that prepares data array and passes it to the CUDA kernel.
@@ -49,6 +50,12 @@ int main(int argc, char **argv) {
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 //	nPCAestimator->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
 	p.addFeature(nPCAestimator);
+
+	FPFH *fpfhEstimator = new FPFH();
+	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	fpfhEstimator->setNormals(nPCAestimator->getNormals());
+
+	p.addFeature(fpfhEstimator);
 
 //	FilterPtr fp = atrousfilter->ptr;
 

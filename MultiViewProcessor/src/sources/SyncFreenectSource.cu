@@ -139,31 +139,16 @@ SyncFreenectSource::loadFrame()
 
 	/* TEST */
 
-//	size_t uc4s = 640*480*sizeof(uchar4);
-////	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
-////	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
-////
+/*
 	char path[50];
-////	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
-////	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
-////
+
 	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
 	checkCudaErrors(cudaMemcpy(h_f4_depth,loader.xyzi,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-//
-//	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
-//	for(int i=0;i<640*480;i++)
-//	{
-//		unsigned char g = h_f4_depth[i].z/20;
-//		h_uc4_depth[i] = make_uchar4(g,g,g,128);
-//	}
-//
-//	sprintf(path,"/home/avo/pcds/src_depth%d.ppm",0);
-//	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
-//
+
 	sprintf(path,"/home/avo/pcds/src_wc_points%d.pcd",0);
 	host::io::PCDIOController pcdIOCtrl;
 	pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
-
+*/
 
 
 	printf("loaded! \n");

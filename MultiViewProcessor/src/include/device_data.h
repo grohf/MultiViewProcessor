@@ -15,7 +15,9 @@ enum DeviceDataType
 
 	Indice = 0x11,
 	BlockIndice = 0x12,
-	WarpIndice = 0x13
+	WarpIndice = 0x13,
+
+	Histogramm = 0x20,
 };
 
 enum ElementType
@@ -34,6 +36,9 @@ enum ElementType
 	FLOAT2 	= 0x32,
 	FLOAT3 	= 0x33,
 	FLOAT4 	= 0x34,
+
+	BINS16 = 0x41,
+
 };
 
 //template<typename T>
