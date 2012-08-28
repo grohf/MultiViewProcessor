@@ -291,59 +291,87 @@ namespace device
 			float4 *input_pos;
 
 //			unsigned int bins;
-			unsigned int bin_offset;
+			unsigned int view;
+
+
+		    __device__ __forceinline__ float4
+		    minusf43(const float4& v1, const float4& v2) const
+		    {
+		      return make_float4(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z,0);
+		    }
+
+		    __device__ __forceinline__ float
+		    dotf43(const float4& v1,const float4& v2) const
+		    {
+		      return v1.x * v2.x + v1.y*v2.y + v1.z*v2.z;
+		    }
+
+		    __device__ __forceinline__ float
+		    lengthf43(const float4& v) const
+		    {
+		      return sqrt(dotf43(v, v));
+		    }
 
 			__device__ __forceinline__ void
 			operator () () const
 			{
-				__shared__ float shm[kx*ky*bins];
-				__shared__ float4 shm_pos[kx*ky];
+//				__shared__ float shm[kx*ky*bins];
+//				__shared__ float4 shm_pos[kx*ky];
 
 				int sx,sy,off,global_off;
 
 				/* ---------- LOAD SHM ----------- */
 				const int oy = blockIdx.y*blockDim.y-kyr;
 				const int ox = blockIdx.x*blockDim.x-kxr;
-
-
-				for(off=threadIdx.y*blockDim.x+threadIdx.x;off<kx*ky;off+=blockDim.x*blockDim.y)
-				{
-					sy = off/kx;
-					sx = off - sy*kx;
-
-					sy = oy + sy;
-					sx = ox + sx;
-
-					if(sx < 0) 		sx	=	0;
-					if(sx > 639) 	sx 	= 639;
-					if(sy < 0)		sy 	= 	0;
-					if(sy > 479)	sy 	= 479;
-
-					for(int i=0;i<bins;i++)
-						shm[off] = spfh_input[(sy*640+sx)*16+bin_offset+i];
-				}
-				__syncthreads();
+//
+//
+//				for(off=threadIdx.y*blockDim.x+threadIdx.x;off<kx*ky;off+=blockDim.x*blockDim.y)
+//				{
+//					sy = off/kx;
+//					sx = off - sy*kx;
+//
+//					sy = oy + sy;
+//					sx = ox + sx;
+//
+//					if(sx < 0) 		sx	=	0;
+//					if(sx > 639) 	sx 	= 639;
+//					if(sy < 0)		sy 	= 	0;
+//					if(sy > 479)	sy 	= 479;
+//
+//					shm_pos[off] = input_pos[sy*640+sx];
+//				}
+//				__syncthreads();
 
 
 				sx = threadIdx.x + blockIdx.x * blockDim.x;
 				sy = threadIdx.y + blockIdx.y * blockDim.y;
 				unsigned int mid_global_off = sy*640+sx;
 
-				unsigned int mid_off = (threadIdx.y+kyr)*kx+threadIdx.x+kxr;
+//				unsigned int mid_off = (threadIdx.y+kyr)*kx+threadIdx.x+kxr;
 
-				float mid_bins[bins];
-				unsigned int point_count;
-				for(sy=0;sy<kl;sy++)
+				float mid_bins[16];
+				for(int i=0;i<16;i++)
+					mid_bins[i] = 0.0f;
+
+				float4 mid_pos = input_pos[view*640*480+mid_global_off];
+
+				unsigned int point_count = 0;
+				for(sy=(oy<0)?(-oy):0;sy<kl;sy++)
 				{
-					for(sx=0;sx<kl ;sx++)
+					for(sx=(ox<0)?(-ox):0;sx<kl ;sx++)
 					{
-						for(int i=0;i<bins;i++)
+						float4 cur_pos = input_pos[view*640*480+(oy+sy)*640+(ox+sx)];
+						float weight = 1.0f/lengthf43(minusf43(mid_pos,cur_pos));
+						for(int i=0;i<16;i++)
 						{
-							mid_bins[i] += shm[(sy*kx+sx)*bins+i];
+							mid_bins[i] += weight * spfh_input[(sy*kx+sx)*16+i];
 							point_count++;
 						}
 					}
 				}
+
+				for(int i=0;i<16;i++)
+					mid_bins[i] /= (float)point_count;
 
 			}
 
