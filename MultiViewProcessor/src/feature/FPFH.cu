@@ -27,7 +27,10 @@
 				nbins = 16
 			};
 
-			unsigned int *bins;
+			float4 *input_pos;
+			float4 *input_normals;
+
+			uint16_t *output_bins;
 
 		    __device__ __forceinline__ float
 		    dotf43(const float4& v1,const float4& v2) const
@@ -61,43 +64,35 @@
 				__shared__ unsigned int shm_bins[kx*ky*16];
 
 
-				unsigned int sx,sy,off;
+				int sx,sy,off;
 
 				/* ---------- LOAD SHM ----------- */
 				const int oy = blockIdx.y*blockDim.y-kyr;
 				const int ox = blockIdx.x*blockDim.x-kxr;
 
-//				off = threadIdx.y*blockDim.x+threadIdx.x;
-				sy = off/kx;
-				sx = off - sy*kx;
-
-
-//				surf3Dread<float4>(&shm_pos[off],surf::surfRef,(ox+sx)*sizeof(float4),(oy+sy),blockIdx.z,cudaBoundaryModeClamp);
-//				surf3Dread<float4>(&shm_normal[off],surf::surfRefBuffer,(ox+sx)*sizeof(float4),(oy+sy),blockIdx.z,cudaBoundaryModeClamp);
-
-
-
-				off += blockDim.x*blockDim.y;
-				if(off<kx*ky){
-					sy = off/kx;
-					sx = off - sy*kx;
-
-//					surf3Dread<float4>(&shm_pos[off],surf::surfRef,(ox+sx)*sizeof(float4),(oy+sy),blockIdx.z,cudaBoundaryModeClamp);
-//					surf3Dread<float4>(&shm_normal[off],surf::surfRefBuffer,(ox+sx)*sizeof(float4),(oy+sy),blockIdx.z,cudaBoundaryModeClamp);
-				}
-				__syncthreads();
-
 
 				for(off=threadIdx.y*blockDim.x+threadIdx.x;off<kx*ky;off+=blockDim.x*blockDim.y)
 				{
+					sy = off/kx;
+					sx = off - sy*kx;
+
+					sy = oy + sy;
+					sx = ox + sx;
+
+					if(sx < 0) 		sx	=	0;
+					if(sx > 639) 	sx 	= 639;
+					if(sy < 0)		sy 	= 	0;
+					if(sy > 479)	sy 	= 479;
+
+					shm_pos[off] = input_pos[blockIdx.z*640*480+sy*640+sx];
+					shm_normal[off] = input_normals[blockIdx.z*640*480+sy*640+sx];
 
 				}
+				__syncthreads();
 
 				unsigned int mid_off = (threadIdx.y+kyr)*kx+threadIdx.x+kxr;
 				float4 mid_pos = shm_pos[off];
 				float4 mid_normal = shm_normal[off];
-
-//				unsigned int (*mid_bins)[16] = &shm_bins[off];
 
 				for(sy=0;sy<(kl+1)/2;sy++)
 				{
@@ -158,7 +153,7 @@
 
 				//TODO COPY all 16 values
 				for(int i=0;i<16;i++)
-					bins[(blockDim.z*640*480+sy*640+sx)*16+i] = shm_bins[mid_off*16+i];
+					output_bins[(blockDim.z*640*480+sy*640+sx)*16+i] = shm_bins[mid_off*16+i];
 
 
 			}
