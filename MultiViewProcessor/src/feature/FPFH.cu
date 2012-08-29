@@ -12,12 +12,49 @@
 #include "utils.hpp"
 
 
+
 namespace device
 {
 	namespace constant
 	{
-		__constant__ float radius;
+//		__constant__ float radius;
 	}
+
+    __device__ __forceinline__ float
+    dotf43(const float4& v1,const float4& v2)
+    {
+      return v1.x * v2.x + v1.y*v2.y + v1.z*v2.z;
+    }
+
+    __device__ __forceinline__ float4
+    minusf43(const float4& v1, const float4& v2)
+    {
+      return make_float4(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z,0);
+    }
+
+    __device__ __host__ __forceinline__ float4
+    crossf43(const float4& v1, const float4& v2)
+    {
+      return make_float4(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x,0);
+    }
+
+    __device__ __forceinline__ float
+    lengthf43(const float4& v)
+    {
+      return sqrt(dotf43(v, v));
+    }
+
+    __device__ __forceinline__ float
+    kldivergence(float *cur,float *mean,int bins)
+    {
+    	float div = 0.f;
+
+    	for(int i=0;i<bins;i++)
+    	{
+    		div += (cur[i]-mean[i])*__logf(cur[i]/mean[i]);
+    	}
+    	return div;
+    }
 }
 
 namespace device
@@ -35,7 +72,7 @@ namespace device
 
 				kl = 2*kxr+1,
 
-				nbins = 16
+				nbins = 8
 			};
 
 			float4 *input_pos;
@@ -46,36 +83,12 @@ namespace device
 			unsigned int view;
 			float radius;
 
-		    __device__ __forceinline__ float
-		    dotf43(const float4& v1,const float4& v2) const
-		    {
-		      return v1.x * v2.x + v1.y*v2.y + v1.z*v2.z;
-		    }
-
-		    __device__ __forceinline__ float4
-		    minusf43(const float4& v1, const float4& v2) const
-		    {
-		      return make_float4(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z,0);
-		    }
-
-		    __device__ __host__ __forceinline__ float4
-		    crossf43(const float4& v1, const float4& v2) const
-		    {
-		      return make_float4(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x,0);
-		    }
-
-		    __device__ __forceinline__ float
-		    lengthf43(const float4& v) const
-		    {
-		      return sqrt(dotf43(v, v));
-		    }
-
 			__device__ __forceinline__ void
 			operator () () const
 			{
 				__shared__ float4 shm_pos[kx*ky];
 				__shared__ float4 shm_normal[kx*ky];
-//				__shared__ unsigned int shm_bins[kx*ky*16];
+//				__shared__ unsigned int shm_bins[kx*ky*8];
 
 
 				int sx,sy,off;
@@ -114,14 +127,14 @@ namespace device
 				float4 mid_normal = shm_normal[mid_off];
 
 				unsigned int point_count = 0;
-				int mid_bin[16];
-				for(int i=0;i<16;i++)
+				int mid_bin[8];
+				for(int i=0;i<8;i++)
 					mid_bin[i]=0;
 
 				if(mid_pos.z==0)
 				{
-					for(int i=0;i<16;i++)
-						mid_bin[i]=-1;
+//					for(int i=0;i<8;i++)
+//						mid_bin[i]=-1;
 
 					return;
 				}
@@ -171,58 +184,29 @@ namespace device
 							idx += 1;
 
 						float f2 = lengthf43( minusf43(pt,ps));
-						if(f2 >= 20)
-							idx += 2;
+//						if(f2 >= 20)
+//							idx += 2;
 
 						if(dotf43(u,minusf43(pt,ps))/f2 >= 0)
-							idx += 4;
+							idx += 2;
 
 						if(atan2f(dotf43(w,nt),dotf43(u,nt)) >= 0)
-							idx += 8;
+							idx += 4;
 
 						mid_bin[idx]++;
 
 //						if( !( (oy+sy) < 0 || (oy+sy) > 479 || (ox+sx) < 0 || (ox+sx) > 639) )
 //						{
-//							atomicAdd(&output_bins[((oy+sy)*640+(ox+sx))*16+idx],1.0f);
+//							atomicAdd(&output_bins[((oy+sy)*640+(ox+sx))*8+idx],1.0f);
 //						}
-//							atomicAdd(&output_bins[mid_global_off*16+idx],1.0f);
+//							atomicAdd(&output_bins[mid_global_off*8+idx],1.0f);
 
 					}
 				}
 
-				for(int i=0;i<16;i++)
-					output_bins[mid_global_off*16+i] = ((float)mid_bin[i])/((float)point_count);
+				for(int i=0;i<8;i++)
+					output_bins[mid_global_off*8+i] = ((float)mid_bin[i])/((float)point_count);
 
-
-				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
-				{
-					for(int i=0;i<16;i++)
-						printf("%d | ",mid_bin[i]);
-
-					printf("\n");
-
-					for(int i=0;i<16;i++)
-						printf("%f | ",output_bins[mid_global_off*16+i]);
-
-
-				}
-
-//				for(int i=0;i<16;i++)
-//					output_bins[mid_global_off*16+i] =
-//							(point_count>0)
-//							?output_bins[mid_global_off*16+i]/(float)point_count
-//							:-1.0f;
-
-
-
-//			if(blockIdx.x==10 && blockIdx.y==2 && threadIdx.x==10 && threadIdx.y==10)
-//			{
-//				for(int i=0;i<16;i++)
-//					printf("%f | ",output_bins[mid_global_off*16+i]);
-//
-//				printf("\n");
-//			}
 
 			}
 		};
@@ -239,31 +223,25 @@ namespace device
 				int sx = threadIdx.x + blockIdx.x * blockDim.x;
 				int sy = threadIdx.y + blockIdx.y * blockDim.y;
 
-				int off = (sy*640+sx)*16;
+				int off = (sy*640+sx)*8;
 
-				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
-				{
-					for(int i=0;i<16;i++)
-						printf("%f | ",inline_bins[off+i]);
-
-					printf("\n");
-				}
+//				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
+//				{
+//					for(int i=0;i<8;i++)
+//						printf("%f | ",inline_bins[off+i]);
+//
+//					printf("\n");
+//				}
 
 				float sum = 0.0;
-				for(int i=0;i<16;i++)
+				for(int i=0;i<8;i++)
 					sum += inline_bins[off+i];
 
-				for(int i=0;i<16;i++)
+				for(int i=0;i<8;i++)
 					inline_bins[off+i] /= sum;
 
 
-				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
-				{
-					for(int i=0;i<16;i++)
-						printf("%f | ",inline_bins[off+i]);
 
-					printf("\n");
-				}
 			}
 		};
 		__global__ void normalizeSPFH(const SPFHNormalizer spfhn){ spfhn(); }
@@ -290,93 +268,272 @@ namespace device
 
 			float4 *input_pos;
 
-//			unsigned int bins;
 			unsigned int view;
+			float radius;
 
 
-		    __device__ __forceinline__ float4
-		    minusf43(const float4& v1, const float4& v2) const
-		    {
-		      return make_float4(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z,0);
-		    }
+//		    __device__ __forceinline__ float4
+//		    minusf43(const float4& v1, const float4& v2) const
+//		    {
+//		      return make_float4(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z,0);
+//		    }
+//
+//		    __device__ __forceinline__ float
+//		    dotf43(const float4& v1,const float4& v2) const
+//		    {
+//		      return v1.x * v2.x + v1.y*v2.y + v1.z*v2.z;
+//		    }
+//
+//		    __device__ __forceinline__ float
+//		    lengthf43(const float4& v) const
+//		    {
+//		      return sqrt(dotf43(v, v));
+//		    }
 
-		    __device__ __forceinline__ float
-		    dotf43(const float4& v1,const float4& v2) const
-		    {
-		      return v1.x * v2.x + v1.y*v2.y + v1.z*v2.z;
-		    }
-
-		    __device__ __forceinline__ float
-		    lengthf43(const float4& v) const
-		    {
-		      return sqrt(dotf43(v, v));
-		    }
-
-			__device__ __forceinline__ void
+		    __device__ __forceinline__ void
 			operator () () const
 			{
-//				__shared__ float shm[kx*ky*bins];
-//				__shared__ float4 shm_pos[kx*ky];
-
-				int sx,sy,off,global_off;
-
-				/* ---------- LOAD SHM ----------- */
 				const int oy = blockIdx.y*blockDim.y-kyr;
 				const int ox = blockIdx.x*blockDim.x-kxr;
-//
-//
-//				for(off=threadIdx.y*blockDim.x+threadIdx.x;off<kx*ky;off+=blockDim.x*blockDim.y)
-//				{
-//					sy = off/kx;
-//					sx = off - sy*kx;
-//
-//					sy = oy + sy;
-//					sx = ox + sx;
-//
-//					if(sx < 0) 		sx	=	0;
-//					if(sx > 639) 	sx 	= 639;
-//					if(sy < 0)		sy 	= 	0;
-//					if(sy > 479)	sy 	= 479;
-//
-//					shm_pos[off] = input_pos[sy*640+sx];
-//				}
-//				__syncthreads();
 
+				const unsigned int gx = threadIdx.x + blockIdx.x * blockDim.x;
+				const unsigned int gy = threadIdx.y + blockIdx.y * blockDim.y;
 
-				sx = threadIdx.x + blockIdx.x * blockDim.x;
-				sy = threadIdx.y + blockIdx.y * blockDim.y;
-				unsigned int mid_global_off = sy*640+sx;
+				float mid_bins[8];
+				for(int i=0;i<8;i++)
+					mid_bins[i] = 0;
 
-//				unsigned int mid_off = (threadIdx.y+kyr)*kx+threadIdx.x+kxr;
-
-				float mid_bins[16];
-				for(int i=0;i<16;i++)
-					mid_bins[i] = 0.0f;
-
-				float4 mid_pos = input_pos[view*640*480+mid_global_off];
-
-				unsigned int point_count = 0;
-				for(sy=(oy<0)?(-oy):0;sy<kl;sy++)
+				float4 mid_pos = input_pos[view*640*480+gy*640+gx];
+				if(mid_pos.z==0)
 				{
-					for(sx=(ox<0)?(-ox):0;sx<kl ;sx++)
+					for(int i=0;i<8;i++)
 					{
-						float4 cur_pos = input_pos[view*640*480+(oy+sy)*640+(ox+sx)];
-						float weight = 1.0f/lengthf43(minusf43(mid_pos,cur_pos));
-						for(int i=0;i<16;i++)
+						fpfh_output[(gy*640+gx)*8+i] = 0.f;
+					}
+					return;
+				}
+				unsigned int point_count = 1;
+				for(int sy=(oy<0)?(-oy):0;sy<kl;sy++)
+				{
+					for(int sx=(ox<0)?(-ox):0;sx<kl ;sx++)
+					{
+						if(sy==kxr && sx==kyr)
+							continue;
+
+						float4 cur_pos = input_pos[view*640*480+(oy+sy+threadIdx.y)*640+(ox+sx+threadIdx.x)];
+						if(cur_pos.z==0)
+							continue;
+
+						float length = lengthf43(minusf43(mid_pos,cur_pos));
+						if(length>radius)
+							continue;
+
+						float weight = 1.f/(1.f+length);
+//						if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
+//						{
+//								printf("(%d/%d) ->mid_pos: %f %f %f | cur_pos: %f %f %f | weight: %f \n",sx,sy,mid_pos.x,mid_pos.y,mid_pos.z,
+//										cur_pos.x,cur_pos.y,cur_pos.z,weight);
+//						}
+
+						for(int i=0;i<8;i++)
 						{
-							mid_bins[i] += weight * spfh_input[(sy*kx+sx)*16+i];
-							point_count++;
+							mid_bins[i] += weight * spfh_input[((oy+sy+threadIdx.y)*640+(ox+sx+threadIdx.x))*8+i];
+							if(spfh_input[((oy+sy+threadIdx.y)*640+(ox+sx+threadIdx.x))*8+i]<0)
+								printf("OOOOOOOOOoooooooooooooooooooOOOOOOOOOOOOOOOOOOOOoooooooooooo!!! \n");
 						}
+
+						point_count++;
 					}
 				}
 
-				for(int i=0;i<16;i++)
-					mid_bins[i] /= (float)point_count;
+				for(int i=0;i<8;i++)
+				{
+					mid_bins[i] = spfh_input[(gy*640+gx)*8+i] + mid_bins[i]/((float) point_count);
+				}
+
+				float sum = 0.f;
+				for(int i=0;i<8;i++)
+				{
+					sum+=mid_bins[i];
+				}
+
+				for(int i=0;i<8;i++)
+				{
+					fpfh_output[(gy*640+gx)*8+i] = mid_bins[i]/sum;
+				}
+
+				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
+				{
+					printf("sum: %f \n",sum);
+					for(int i=0;i<8;i++)
+					{
+						printf("%f | ",mid_bins[i]/sum);
+
+					}
+					printf("\n");
+				}
+			}
+		};
+		__global__ void computeFPFH(const FPFHEstimator fpfhe){ fpfhe(); }
+
+
+		template <unsigned int blockSize>
+		struct Mean8BinHistogramEstimator
+		{
+			float *input_fpfh;
+			float *output_meanHisto;
+			unsigned int n;
+
+		    __device__ __forceinline__ void
+			operator () () const
+			{
+		    	extern __shared__ float shm[];
+
+		        unsigned int tid = threadIdx.x;
+		        unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
+		        unsigned int gridSize = blockSize*2*gridDim.x;
+
+		    	float sum = 0.f;
+		    	while(i<n)
+		    	{
+		    		sum += input_fpfh[i];
+
+		    		if(threadIdx.x==0)
+		    			printf("sum: %f inp: %f i: %d \n",sum,input_fpfh[i],i);
+
+		            // ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
+		            if ( (i + blockSize) < n)
+		            	sum += input_fpfh[i+blockSize];
+
+		            i += gridSize;
+		    	}
+
+		        // each thread puts its local sum into shared memory
+		    	shm[tid] = sum;
+		        __syncthreads();
+
+		        // do reduction in shared mem
+		        if (blockSize >= 1024)
+		        {
+		            if (tid < 512)
+		            {
+		                shm[tid] = sum = sum + shm[tid + 512];
+		            }
+
+		            __syncthreads();
+		        }
+
+
+		        if (blockSize >= 512)
+		        {
+		            if (tid < 256)
+		            {
+		                shm[tid] = sum = sum + shm[tid + 256];
+		            }
+
+		            __syncthreads();
+		        }
+
+		        if (blockSize >= 256)
+		        {
+		            if (tid < 128)
+		            {
+		            	shm[tid] = sum = sum + shm[tid + 128];
+		            }
+
+		            __syncthreads();
+		        }
+
+		        if (blockSize >= 128)
+		        {
+		            if (tid <  64)
+		            {
+		            	shm[tid] = sum = sum + shm[tid +  64];
+		            }
+
+		            __syncthreads();
+		        }
+
+				if (tid < 32)
+				{
+					 // now that we are using warp-synchronous programming (below)
+					 // we need to declare our shared memory volatile so that the compiler
+					 // doesn't reorder stores to it and induce incorrect behavior.
+					 volatile float *smem = shm;
+
+					 if (blockSize >=  64)
+					 {
+						 smem[tid] = sum = sum + smem[tid + 32];
+					 }
+
+					 if (blockSize >=  32)
+					 {
+						 smem[tid] = sum = sum + smem[tid + 16];
+					 }
+
+					 if (blockSize >=  16)
+					 {
+						 smem[tid] = sum = sum + smem[tid +  8];
+					 }
+
+					if (blockSize >=   8)
+					{
+						smem[tid] += smem[tid +  4];
+					}
+
+					if (blockSize >=   4)
+					{
+						smem[tid] += smem[tid +  2];
+					}
+
+					if (blockSize >=   2)
+					{
+						smem[tid] += smem[tid +  1];
+					}
+
+				}
+
+			if(tid<8)
+				output_meanHisto[tid] = sum/shm[0];
+			}
+
+		};
+		__global__ void estimateMean8BitHistogram(const Mean8BinHistogramEstimator<1024> mhe){ mhe(); }
+
+
+		struct DivHistogramEstimator
+		{
+			float *input_fpfh;
+			float *input_mean;
+
+			float *output_div;
+
+		    __device__ __forceinline__ void
+			operator () () const
+			{
+				const unsigned int gx = threadIdx.x + blockIdx.x * blockDim.x;
+				const unsigned int gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+				output_div[gy*640+gx] = kldivergence(&input_fpfh[(gy*640+gx)*8],&input_mean[0],8);
+
+			}
+		};
+		__global__ void computeDivHistogram(const DivHistogramEstimator de){ de(); }
+
+
+		struct PFPFHEstimator
+		{
+
+			float *input_fpfh1;
+			float *input_fpfh2;
+
+		    __device__ __forceinline__ void
+			operator () () const
+			{
 
 			}
 
 		};
-
 
 }
 
@@ -389,29 +546,36 @@ device::SPFHEstimator spfhEstimator2;
 device::FPFHEstimator fpfhEstimator1;
 device::FPFHEstimator fpfhEstimator2;
 
+device::Mean8BinHistogramEstimator<1024> meanEstimator1;
+
+device::DivHistogramEstimator divEstimator1;
+
 void FPFH::init()
 {
 	spfhEstimator1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
 	spfhEstimator1.input_normals = (float4 *)getInputDataPointer(PointNormal);
 	spfhEstimator1.output_bins = (float *)getTargetDataPointer(SPFHistogram1);
 
-	spfhEstimator2.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
-	spfhEstimator2.input_normals = (float4 *)getInputDataPointer(PointNormal);
-	spfhEstimator2.output_bins = (float *)getTargetDataPointer(SPFHistogram2);
-
-
-//	spfhNormailizer1.inline_bins = (float *)getTargetDataPointer(SPFHistogram1);
-//
-//	spfhNormailizer2.inline_bins = (float *)getTargetDataPointer(SPFHistogram2);
+//	spfhEstimator2.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+//	spfhEstimator2.input_normals = (float4 *)getInputDataPointer(PointNormal);
+//	spfhEstimator2.output_bins = (float *)getTargetDataPointer(SPFHistogram2);
 
 
 	fpfhEstimator1.spfh_input = (float *)getTargetDataPointer(SPFHistogram1);
+	fpfhEstimator1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
 	fpfhEstimator1.fpfh_output = (float *)getTargetDataPointer(FPFHistogram1);
 
-	fpfhEstimator2.spfh_input = (float *)getTargetDataPointer(SPFHistogram2);
-	fpfhEstimator2.fpfh_output = (float *)getTargetDataPointer(FPFHistogram2);
+//	fpfhEstimator2.spfh_input = (float *)getTargetDataPointer(SPFHistogram2);
+//	fpfhEstimator2.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+//	fpfhEstimator2.fpfh_output = (float *)getTargetDataPointer(FPFHistogram2);
 
 
+	meanEstimator1.input_fpfh = (float *)getTargetDataPointer(FPFHistogram1);
+	meanEstimator1.output_meanHisto = (float *)getTargetDataPointer(MeanHistogram1);
+
+	divEstimator1.input_fpfh = (float *)getTargetDataPointer(FPFHistogram1);
+	divEstimator1.input_mean = (float *)getTargetDataPointer(MeanHistogram1);
+	divEstimator1.output_div = (float *)getTargetDataPointer(DivHistogram1);
 
 	block = dim3(32,24);
 	grid = dim3(640/block.x,480/block.y);
@@ -422,14 +586,14 @@ void FPFH::init()
 void FPFH::execute()
 {
 
-	float radii[] = {1.5f,2.0f,2.5f};
+	float radii[] = {15.0f,20.f,25.f};
 
 //	device::SPFHEstimator *cur_estimator = &spfhEstimator1;
 
 	for(int v=0;v<1;v++)
 	{
 		spfhEstimator1.view = v;
-		spfhEstimator2.view = v;
+//		spfhEstimator2.view = v;
 
 //		radius = radii[0];
 //		cudaMemcpy(&device::constant::radius,&radius,sizeof(float),cudaMemcpyHostToDevice);
@@ -443,7 +607,44 @@ void FPFH::execute()
 //		checkCudaErrors(cudaGetLastError());
 //		checkCudaErrors(cudaDeviceSynchronize());
 
+		fpfhEstimator1.view = v;
+		fpfhEstimator1.radius = radii[0];
+		device::computeFPFH<<<grid,block>>>(fpfhEstimator1);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
 
+
+//		float *h_testdata = (float *)malloc(640*480*8*sizeof(float));
+//		for(int i=0;i<640*480;i++)
+//		{
+//			for(int b=0;b<8;b++)
+//				h_testdata[i*8+b]=b;
+//		}
+//
+//		checkCudaErrors(cudaMemcpy(meanEstimator1.input_fpfh,h_testdata,640*480*8*sizeof(float),cudaMemcpyHostToDevice));
+//		checkCudaErrors(cudaGetLastError());
+//		checkCudaErrors(cudaDeviceSynchronize());
+
+		dim3 meanblock(32*32);
+		meanEstimator1.n = 640*480*8;
+		device::estimateMean8BitHistogram<<<1,meanblock,32*32*sizeof(float)>>>(meanEstimator1);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+		float *h_mean_testdata = (float *)malloc(8*sizeof(float));
+		checkCudaErrors(cudaMemcpy(h_mean_testdata,meanEstimator1.output_meanHisto,8*sizeof(float),cudaMemcpyDeviceToHost));
+
+		for(int b=0;b<8;b++)
+			printf("%f |",h_mean_testdata[b]);
+
+		device::computeDivHistogram<<<grid,block>>>(divEstimator1);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+
+		printf("\n");
+
+		printf("fpfh done... \n");
 
 		for(int ri=0;ri<1;ri++)
 		{

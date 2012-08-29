@@ -29,6 +29,11 @@ class FPFH: public Feature {
 		FPFHistogram1,
 		FPFHistogram2,
 
+		MeanHistogram1,
+		MeanHistogram2,
+
+		DivHistogram1,
+
 		PFPFHistogram,
 		PFPFHIndices,
 	};
@@ -41,7 +46,7 @@ public:
 
 		DeviceDataParams params;
 		params.elements = 640*480;
-		params.element_size = 16 * sizeof(float);
+		params.element_size = 8 * sizeof(float);
 		params.elementType = FLOAT1;
 		params.dataType = Histogramm;
 
@@ -50,6 +55,24 @@ public:
 
 		addTargetData(addDeviceDataRequest(params),FPFHistogram1);
 		addTargetData(addDeviceDataRequest(params),FPFHistogram2);
+
+		DeviceDataParams meanHistoparams;
+		meanHistoparams.elements = 8;
+		meanHistoparams.element_size = sizeof(float);
+		meanHistoparams.elementType = FLOAT1;
+		meanHistoparams.dataType = Histogramm;
+
+		addTargetData(addDeviceDataRequest(meanHistoparams),MeanHistogram1);
+		addTargetData(addDeviceDataRequest(meanHistoparams),MeanHistogram2);
+
+		DeviceDataParams divHistogramParams;
+		divHistogramParams.elements = 640*480;
+		divHistogramParams.element_size = sizeof(float);
+		divHistogramParams.elementType = FLOAT1;
+		divHistogramParams.dataType = Histogramm;
+
+		addTargetData(addDeviceDataRequest(divHistogramParams),DivHistogram1);
+
 
 	}
 	~FPFH(){
