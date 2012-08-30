@@ -34,6 +34,11 @@ class FPFH: public Feature {
 
 		DivHistogram1,
 
+		Sigma1,
+
+
+		TestMap,
+
 		PFPFHistogram,
 		PFPFHIndices,
 	};
@@ -73,6 +78,20 @@ public:
 
 		addTargetData(addDeviceDataRequest(divHistogramParams),DivHistogram1);
 
+		DeviceDataParams sigmaHistoparams;
+		sigmaHistoparams.elements = 1;
+		sigmaHistoparams.element_size = sizeof(float);
+		sigmaHistoparams.elementType = FLOAT1;
+		sigmaHistoparams.dataType = Sigma;
+		addTargetData(addDeviceDataRequest(sigmaHistoparams),Sigma1);
+
+
+		DeviceDataParams TestMapParams;
+		TestMapParams.elements = 640*480;
+		TestMapParams.element_size = sizeof(uchar4);
+		TestMapParams.elementType = UCHAR4;
+		TestMapParams.dataType = Point4D;
+		addTargetData(addDeviceDataRequest(TestMapParams),TestMap);
 
 	}
 	~FPFH(){

@@ -55,6 +55,21 @@ namespace device
     	}
     	return div;
     }
+
+    __device__ __forceinline__ float
+    euclideandivergence(float *cur,float *mean,int bins)
+    {
+    	float div = 0.f;
+
+    	for(int i=0;i<bins;i++)
+    	{
+    		float d = (cur[i]-mean[i]);
+    		div += d*d;
+    	}
+    	return sqrtf(div);
+//    	return div;
+    }
+
 }
 
 namespace device
@@ -362,16 +377,16 @@ namespace device
 					fpfh_output[(gy*640+gx)*8+i] = mid_bins[i]/sum;
 				}
 
-				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
-				{
-					printf("sum: %f \n",sum);
-					for(int i=0;i<8;i++)
-					{
-						printf("%f | ",mid_bins[i]/sum);
-
-					}
-					printf("\n");
-				}
+//				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
+//				{
+//					printf("sum: %f \n",sum);
+//					for(int i=0;i<8;i++)
+//					{
+//						printf("%f | ",mid_bins[i]/sum);
+//
+//					}
+//					printf("\n");
+//				}
 			}
 		};
 		__global__ void computeFPFH(const FPFHEstimator fpfhe){ fpfhe(); }
@@ -398,8 +413,8 @@ namespace device
 		    	{
 		    		sum += input_fpfh[i];
 
-		    		if(threadIdx.x==0)
-		    			printf("sum: %f inp: %f i: %d \n",sum,input_fpfh[i],i);
+//		    		if(threadIdx.x==0)
+//		    			printf("sum: %f inp: %f i: %d \n",sum,input_fpfh[i],i);
 
 		            // ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
 		            if ( (i + blockSize) < n)
@@ -514,47 +529,60 @@ namespace device
 				const unsigned int gx = threadIdx.x + blockIdx.x * blockDim.x;
 				const unsigned int gy = threadIdx.y + blockIdx.y * blockDim.y;
 
-				output_div[gy*640+gx] = kldivergence(&input_fpfh[(gy*640+gx)*8],&input_mean[0],8);
+//				output_div[gy*640+gx] = kldivergence(&input_fpfh[(gy*640+gx)*8],&input_mean[0],8);
+				output_div[gy*640+gx] = euclideandivergence(&input_fpfh[(gy*640+gx)*8],&input_mean[0],8);
 
 			}
 		};
 		__global__ void computeDivHistogram(const DivHistogramEstimator de){ de(); }
 
 
+
 		template <unsigned int blockSize>
 		struct SigmaEstimator
 		{
 			float *input_div;
+			float4 *input_pos;
 			float *output_sigma;
 
 			unsigned int n;
+			unsigned int view;
 
 			 __device__ __forceinline__ void
 			operator () () const
 			{
 				extern __shared__ float shm[];
 
+//				unsigned int *shm_count = &shm[blockDim.x*blockDim.y];
+
 				unsigned int tid = threadIdx.x;
 				unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
 				unsigned int gridSize = blockSize*2*gridDim.x;
 
 				float sum = 0.f;
+				float count = 0.f;
 				while(i<n)
 				{
-					sum += input_div[i];
+					float tmp = input_div[i];
+					sum += tmp*tmp;
+					count += (input_pos[view*640*480+i].z==0)?0:1;
 
 					if(threadIdx.x==0)
 						printf("sum: %f inp: %f i: %d \n",sum,input_div[i],i);
 
 					// ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
 					if ( (i + blockSize) < n)
-						sum += input_div[i+blockSize];
-
+					{
+						tmp = input_div[i+blockSize];
+						sum += tmp*tmp;
+						count += (input_pos[view*640*480+i+blockSize].z==0)?0:1;
+					}
 					i += gridSize;
 				}
 
 				// each thread puts its local sum into shared memory
 				shm[tid] = sum;
+				shm[blockDim.x*blockDim.y+tid] = count;
 				__syncthreads();
 
 				// do reduction in shared mem
@@ -563,6 +591,7 @@ namespace device
 					if (tid < 512)
 					{
 						shm[tid] = sum = sum + shm[tid + 512];
+						shm[blockDim.x*blockDim.y+tid] = count = count + shm[blockDim.x*blockDim.y+tid + 512];
 					}
 
 					__syncthreads();
@@ -574,6 +603,7 @@ namespace device
 					if (tid < 256)
 					{
 						shm[tid] = sum = sum + shm[tid + 256];
+						shm[blockDim.x*blockDim.y+tid] = count = count + shm[blockDim.x*blockDim.y+tid + 256];
 					}
 
 					__syncthreads();
@@ -584,6 +614,7 @@ namespace device
 					if (tid < 128)
 					{
 						shm[tid] = sum = sum + shm[tid + 128];
+						shm[blockDim.x*blockDim.y+tid] = count = count + shm[blockDim.x*blockDim.y+tid + 128];
 					}
 
 					__syncthreads();
@@ -594,6 +625,7 @@ namespace device
 					if (tid <  64)
 					{
 						shm[tid] = sum = sum + shm[tid +  64];
+						shm[blockDim.x*blockDim.y+tid] = count = count + shm[blockDim.x*blockDim.y+tid + 64];
 					}
 
 					__syncthreads();
@@ -609,55 +641,88 @@ namespace device
 					 if (blockSize >=  64)
 					 {
 						 smem[tid] = sum = sum + smem[tid + 32];
+						 smem[blockDim.x*blockDim.y+tid] = count = count + smem[blockDim.x*blockDim.y+tid + 32];
 					 }
 
 					 if (blockSize >=  32)
 					 {
 						 smem[tid] = sum = sum + smem[tid + 16];
+						 smem[blockDim.x*blockDim.y+tid] = count = count + smem[blockDim.x*blockDim.y+tid + 16];
 					 }
 
 					 if (blockSize >=  16)
 					 {
 						 smem[tid] = sum = sum + smem[tid +  8];
+						 smem[blockDim.x*blockDim.y+tid] = count = count + smem[blockDim.x*blockDim.y+tid + 8];
 					 }
 
 					if (blockSize >=   8)
 					{
-						smem[tid] += smem[tid +  4];
+						smem[tid] = sum = sum + smem[tid +  4];
+						smem[blockDim.x*blockDim.y+tid] = count = count + smem[blockDim.x*blockDim.y+tid + 4];
 					}
 
 					if (blockSize >=   4)
 					{
-						smem[tid] += smem[tid +  2];
+						smem[tid] = sum = sum + smem[tid +  2];
+						smem[blockDim.x*blockDim.y+tid] = count = count + smem[blockDim.x*blockDim.y+tid + 2];
 					}
 
 					if (blockSize >=   2)
 					{
-						smem[tid] += smem[tid +  1];
+						smem[tid] = sum = sum + smem[tid +  1];
+						smem[blockDim.x*blockDim.y+tid] = count = count + smem[blockDim.x*blockDim.y+tid + 1];
 					}
 				}
 
-			if(tid==0)
-				output_sigma[tid] = shm[tid];
+				if(tid==0)
+				{
+					float sigma = sqrt(sum/(count-1));
+					printf("sum: %f | count: %f | sigma: %f \n",sum,count,sigma);
+					output_sigma[tid] = sigma;
+				}
 			}
 
 		};
-		__global__ void computeSigma(const SigmaEstimator se){ se(); }
+		__global__ void computeSigma(const SigmaEstimator<1024> se){ se(); }
 
 
 		struct PFPFHEstimator
 		{
 
-			float *input_fpfh1;
-			float *input_fpfh2;
+			float4 *input_pos;
+			unsigned int view;
+			float beta;
+
+
+			float *input_div1;
+			float *input_sigma1;
+
+//			unsigned int *output_persistence_map;
+
+			uchar4 *output_persistence_map;
 
 		    __device__ __forceinline__ void
 			operator () () const
 			{
+				const unsigned int gx = threadIdx.x + blockIdx.x * blockDim.x;
+				const unsigned int gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+
+				float z = input_pos[view*640*480+gy*640+gx].z;
+
+				if( z==0 || input_div1[gy*640+gx]< beta*input_sigma1[0] )
+				{
+					output_persistence_map[view*640*480+gy*640+gx] = make_uchar4(z/30.,z/30.,z/30.,0);
+					return;
+				}
+				output_persistence_map[view*640*480+gy*640+gx] = make_uchar4(input_div1[gy*640+gx]*200,0,0,0);
 
 			}
 
 		};
+		__global__ void computePersistenceFPFH(const PFPFHEstimator pfpfh){ pfpfh(); }
+
 
 }
 
@@ -673,6 +738,11 @@ device::FPFHEstimator fpfhEstimator2;
 device::Mean8BinHistogramEstimator<1024> meanEstimator1;
 
 device::DivHistogramEstimator divEstimator1;
+
+device::SigmaEstimator<1024> sigEstimator1;
+
+
+device::PFPFHEstimator pfpfhEstimator;
 
 void FPFH::init()
 {
@@ -700,6 +770,17 @@ void FPFH::init()
 	divEstimator1.input_fpfh = (float *)getTargetDataPointer(FPFHistogram1);
 	divEstimator1.input_mean = (float *)getTargetDataPointer(MeanHistogram1);
 	divEstimator1.output_div = (float *)getTargetDataPointer(DivHistogram1);
+
+
+	sigEstimator1.input_div = (float *)getTargetDataPointer(DivHistogram1);
+	sigEstimator1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+	sigEstimator1.output_sigma = (float *)getTargetDataPointer(Sigma1);
+
+
+	pfpfhEstimator.input_div1 = (float *)getTargetDataPointer(DivHistogram1);
+	pfpfhEstimator.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+	pfpfhEstimator.input_sigma1 = (float *)getTargetDataPointer(Sigma1);
+	pfpfhEstimator.output_persistence_map = (uchar4 *)getTargetDataPointer(TestMap);
 
 	block = dim3(32,24);
 	grid = dim3(640/block.x,480/block.y);
@@ -764,6 +845,36 @@ void FPFH::execute()
 		device::computeDivHistogram<<<grid,block>>>(divEstimator1);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
+
+//		float *h_f_div_data = (float *)malloc(640*480*sizeof(float));
+//		checkCudaErrors(cudaMemcpy(h_f_div_data,divEstimator1.output_div,640*480*sizeof(float),cudaMemcpyDeviceToHost));
+//
+//		for(int i=640*200;i<640*210;i++)
+//		{
+//			printf(" %f ",h_f_div_data[i]);
+//			if(i%40==0) printf("\n");
+//		}
+
+
+
+		sigEstimator1.n = 640*480;
+		sigEstimator1.view = v;
+		device::computeSigma<<<1,meanblock,32*32*2*sizeof(float)>>>(sigEstimator1);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+		pfpfhEstimator.view = v;
+		pfpfhEstimator.beta = 1.6f;
+		device::computePersistenceFPFH<<<grid,block>>>(pfpfhEstimator);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+		uchar4 *h_uc4_persistence_data = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		checkCudaErrors(cudaMemcpy(h_uc4_persistence_data,pfpfhEstimator.output_persistence_map,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
+
+		char path[50];
+		sprintf(path,"/home/avo/pcds/persitence_map%d.ppm",0);
+		sdkSavePPM4ub(path,(unsigned char*)h_uc4_persistence_data,640,480);
 
 
 		printf("\n");

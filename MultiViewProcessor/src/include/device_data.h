@@ -17,7 +17,8 @@ enum DeviceDataType
 	BlockIndice = 0x12,
 	WarpIndice = 0x13,
 
-	Histogramm = 0x20,
+	Histogramm 	= 0x20,
+	Sigma		= 0x30,
 };
 
 enum ElementType
