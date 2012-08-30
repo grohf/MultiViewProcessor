@@ -521,6 +521,130 @@ namespace device
 		__global__ void computeDivHistogram(const DivHistogramEstimator de){ de(); }
 
 
+		template <unsigned int blockSize>
+		struct SigmaEstimator
+		{
+			float *input_div;
+			float *output_sigma;
+
+			unsigned int n;
+
+			 __device__ __forceinline__ void
+			operator () () const
+			{
+				extern __shared__ float shm[];
+
+				unsigned int tid = threadIdx.x;
+				unsigned int i = blockIdx.x*blockSize*2 + threadIdx.x;
+				unsigned int gridSize = blockSize*2*gridDim.x;
+
+				float sum = 0.f;
+				while(i<n)
+				{
+					sum += input_div[i];
+
+					if(threadIdx.x==0)
+						printf("sum: %f inp: %f i: %d \n",sum,input_div[i],i);
+
+					// ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
+					if ( (i + blockSize) < n)
+						sum += input_div[i+blockSize];
+
+					i += gridSize;
+				}
+
+				// each thread puts its local sum into shared memory
+				shm[tid] = sum;
+				__syncthreads();
+
+				// do reduction in shared mem
+				if (blockSize >= 1024)
+				{
+					if (tid < 512)
+					{
+						shm[tid] = sum = sum + shm[tid + 512];
+					}
+
+					__syncthreads();
+				}
+
+
+				if (blockSize >= 512)
+				{
+					if (tid < 256)
+					{
+						shm[tid] = sum = sum + shm[tid + 256];
+					}
+
+					__syncthreads();
+				}
+
+				if (blockSize >= 256)
+				{
+					if (tid < 128)
+					{
+						shm[tid] = sum = sum + shm[tid + 128];
+					}
+
+					__syncthreads();
+				}
+
+				if (blockSize >= 128)
+				{
+					if (tid <  64)
+					{
+						shm[tid] = sum = sum + shm[tid +  64];
+					}
+
+					__syncthreads();
+				}
+
+				if (tid < 32)
+				{
+					 // now that we are using warp-synchronous programming (below)
+					 // we need to declare our shared memory volatile so that the compiler
+					 // doesn't reorder stores to it and induce incorrect behavior.
+					 volatile float *smem = shm;
+
+					 if (blockSize >=  64)
+					 {
+						 smem[tid] = sum = sum + smem[tid + 32];
+					 }
+
+					 if (blockSize >=  32)
+					 {
+						 smem[tid] = sum = sum + smem[tid + 16];
+					 }
+
+					 if (blockSize >=  16)
+					 {
+						 smem[tid] = sum = sum + smem[tid +  8];
+					 }
+
+					if (blockSize >=   8)
+					{
+						smem[tid] += smem[tid +  4];
+					}
+
+					if (blockSize >=   4)
+					{
+						smem[tid] += smem[tid +  2];
+					}
+
+					if (blockSize >=   2)
+					{
+						smem[tid] += smem[tid +  1];
+					}
+				}
+
+			if(tid==0)
+				output_sigma[tid] = shm[tid];
+			}
+
+		};
+		__global__ void computeSigma(const SigmaEstimator se){ se(); }
+
+
 		struct PFPFHEstimator
 		{
 
