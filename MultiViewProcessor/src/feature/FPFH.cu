@@ -79,7 +79,7 @@ namespace device
 
 			enum
 			{
-				kxr = 3,
+				kxr = 5,
 				kyr = kxr,
 
 				kx = 32+kxr*2,
@@ -101,8 +101,11 @@ namespace device
 			__device__ __forceinline__ void
 			operator () () const
 			{
+//				__shared__ float4 shm_pos[kx*ky];
 				__shared__ float4 shm_pos[kx*ky];
 				__shared__ float4 shm_normal[kx*ky];
+
+
 //				__shared__ unsigned int shm_bins[kx*ky*8];
 
 
@@ -142,14 +145,15 @@ namespace device
 				float4 mid_normal = shm_normal[mid_off];
 
 				unsigned int point_count = 0;
+				unsigned int invalid_points = 0;
 				int mid_bin[8];
 				for(int i=0;i<8;i++)
 					mid_bin[i]=0;
 
 				if(mid_pos.z==0)
 				{
-//					for(int i=0;i<8;i++)
-//						mid_bin[i]=-1;
+					for(int i=0;i<8;i++)
+						output_bins[mid_global_off*8+i] = -1;
 
 					return;
 				}
@@ -161,9 +165,17 @@ namespace device
 					{
 						off = (threadIdx.y+sy)*kx+threadIdx.x+sx;
 						float4 cur_pos = shm_pos[off];
+
+//						float4 cur_pos = input_pos
 						float4 cur_normal = shm_normal[off];
 
-						if(lengthf43(minusf43(mid_pos,cur_pos))>radius && mid_off==off && cur_pos.z==0)
+						if(cur_pos.z==0)
+						{
+							invalid_points++;
+							continue;
+						}
+
+						if(lengthf43(minusf43(mid_pos,cur_pos))>radius || mid_off==off)
 						{
 								continue;
 						}
@@ -220,7 +232,7 @@ namespace device
 				}
 
 				for(int i=0;i<8;i++)
-					output_bins[mid_global_off*8+i] = ((float)mid_bin[i])/((float)point_count);
+					output_bins[mid_global_off*8+i] = (point_count > 0 && invalid_points/point_count < 0.3)?((float)mid_bin[i])/((float)point_count):-1;
 
 
 			}
@@ -319,25 +331,55 @@ namespace device
 					mid_bins[i] = 0;
 
 				float4 mid_pos = input_pos[view*640*480+gy*640+gx];
-				if(mid_pos.z==0)
+
+				if(spfh_input[(gy*640+gx)*8+0]==-1)
 				{
 					for(int i=0;i<8;i++)
 					{
-						fpfh_output[(gy*640+gx)*8+i] = 0.f;
+						fpfh_output[(gy*640+gx)*8+i] = -1.f;
 					}
 					return;
 				}
-				unsigned int point_count = 1;
-				for(int sy=(oy<0)?(-oy):0;sy<kl;sy++)
+
+				if(mid_pos.z==0)
 				{
-					for(int sx=(ox<0)?(-ox):0;sx<kl ;sx++)
+					printf("THIS SHOUDN'T HAPPEN!!!! \n");
+					for(int i=0;i<8;i++)
 					{
-						if(sy==kxr && sx==kyr)
+						fpfh_output[(gy*640+gx)*8+i] = -1.f;
+					}
+					return;
+				}
+
+				unsigned int point_count = 1;
+				for(int fy=0;fy<kl;fy++)
+				{
+					for(int fx=0;fx<kl ;fx++)
+					{
+						if(fy==kxr && fx==kyr)
 							continue;
 
-						float4 cur_pos = input_pos[view*640*480+(oy+sy+threadIdx.y)*640+(ox+sx+threadIdx.x)];
-						if(cur_pos.z==0)
+						int iy = oy + threadIdx.y + fy;
+						int ix = ox + threadIdx.x + fx;
+
+						if(ix < 0) 		ix	=	0;
+						if(ix > 639) 	ix 	= 639;
+						if(iy < 0)		iy 	= 	0;
+						if(iy > 479)	iy 	= 479;
+
+
+						float4 cur_pos = input_pos[view*640*480+iy*640+ix];
+
+						if( spfh_input[(iy*640+ix)*8] == -1.f)
+						{
 							continue;
+						}
+
+						if(cur_pos.z==0)
+						{
+							printf("What shouldn't HAPPEN PART II!!! (%d/%d) \n",ix,iy);
+							continue;
+						}
 
 						float length = lengthf43(minusf43(mid_pos,cur_pos));
 						if(length>radius)
@@ -352,8 +394,8 @@ namespace device
 
 						for(int i=0;i<8;i++)
 						{
-							mid_bins[i] += weight * spfh_input[((oy+sy+threadIdx.y)*640+(ox+sx+threadIdx.x))*8+i];
-							if(spfh_input[((oy+sy+threadIdx.y)*640+(ox+sx+threadIdx.x))*8+i]<0)
+							mid_bins[i] += weight * spfh_input[(iy*640+ix)*8+i];
+							if(spfh_input[(iy*640+ix)*8+i]<0)
 								printf("OOOOOOOOOoooooooooooooooooooOOOOOOOOOOOOOOOOOOOOoooooooooooo!!! \n");
 						}
 
@@ -377,16 +419,6 @@ namespace device
 					fpfh_output[(gy*640+gx)*8+i] = mid_bins[i]/sum;
 				}
 
-//				if(blockIdx.x==10 && blockIdx.y==12 && threadIdx.x==10 && threadIdx.y==10)
-//				{
-//					printf("sum: %f \n",sum);
-//					for(int i=0;i<8;i++)
-//					{
-//						printf("%f | ",mid_bins[i]/sum);
-//
-//					}
-//					printf("\n");
-//				}
 			}
 		};
 		__global__ void computeFPFH(const FPFHEstimator fpfhe){ fpfhe(); }
@@ -411,14 +443,14 @@ namespace device
 		    	float sum = 0.f;
 		    	while(i<n)
 		    	{
-		    		sum += input_fpfh[i];
+		    		sum += (input_fpfh[i]>0)?input_fpfh[i]:0;
 
 //		    		if(threadIdx.x==0)
 //		    			printf("sum: %f inp: %f i: %d \n",sum,input_fpfh[i],i);
 
 		            // ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
 		            if ( (i + blockSize) < n)
-		            	sum += input_fpfh[i+blockSize];
+		            	sum += (input_fpfh[i+blockSize]>0)?input_fpfh[i+blockSize]:0;
 
 		            i += gridSize;
 		    	}
@@ -529,8 +561,8 @@ namespace device
 				const unsigned int gx = threadIdx.x + blockIdx.x * blockDim.x;
 				const unsigned int gy = threadIdx.y + blockIdx.y * blockDim.y;
 
-//				output_div[gy*640+gx] = kldivergence(&input_fpfh[(gy*640+gx)*8],&input_mean[0],8);
-				output_div[gy*640+gx] = euclideandivergence(&input_fpfh[(gy*640+gx)*8],&input_mean[0],8);
+				float *inp = &input_fpfh[(gy*640+gx)*8];
+				output_div[gy*640+gx] = (inp[0]>=0)?euclideandivergence(inp,&input_mean[0],8):-1.f;
 
 			}
 		};
@@ -564,18 +596,24 @@ namespace device
 				while(i<n)
 				{
 					float tmp = input_div[i];
-					sum += tmp*tmp;
-					count += (input_pos[view*640*480+i].z==0)?0:1;
+					if(tmp!=-1.f)
+					{
+						sum += tmp*tmp;
+						count ++;
+					}
 
-					if(threadIdx.x==0)
-						printf("sum: %f inp: %f i: %d \n",sum,input_div[i],i);
+//					if(threadIdx.x==0)
+//						printf("sum: %f inp: %f i: %d \n",sum,input_div[i],i);
 
 					// ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
 					if ( (i + blockSize) < n)
 					{
 						tmp = input_div[i+blockSize];
-						sum += tmp*tmp;
-						count += (input_pos[view*640*480+i+blockSize].z==0)?0:1;
+						if(tmp!=-1.f)
+						{
+							sum += tmp*tmp;
+							count ++;
+						}
 					}
 					i += gridSize;
 				}
@@ -711,12 +749,16 @@ namespace device
 
 				float z = input_pos[view*640*480+gy*640+gx].z;
 
-				if( z==0 || input_div1[gy*640+gx]< beta*input_sigma1[0] )
+				float div = input_div1[gy*640+gx];
+
+				if(input_div1[gy*640+gx]< beta*input_sigma1[0])
 				{
 					output_persistence_map[view*640*480+gy*640+gx] = make_uchar4(z/30.,z/30.,z/30.,0);
 					return;
 				}
-				output_persistence_map[view*640*480+gy*640+gx] = make_uchar4(input_div1[gy*640+gx]*200,0,0,0);
+
+
+				output_persistence_map[view*640*480+gy*640+gx] = make_uchar4(div*200,0,0,0);
 
 			}
 
@@ -842,6 +884,7 @@ void FPFH::execute()
 		for(int b=0;b<8;b++)
 			printf("%f |",h_mean_testdata[b]);
 
+
 		device::computeDivHistogram<<<grid,block>>>(divEstimator1);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
@@ -863,6 +906,7 @@ void FPFH::execute()
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
+
 		pfpfhEstimator.view = v;
 		pfpfhEstimator.beta = 1.6f;
 		device::computePersistenceFPFH<<<grid,block>>>(pfpfhEstimator);
@@ -875,6 +919,9 @@ void FPFH::execute()
 		char path[50];
 		sprintf(path,"/home/avo/pcds/persitence_map%d.ppm",0);
 		sdkSavePPM4ub(path,(unsigned char*)h_uc4_persistence_data,640,480);
+
+
+
 
 
 		printf("\n");
