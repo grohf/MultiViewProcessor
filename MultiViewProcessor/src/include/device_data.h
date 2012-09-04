@@ -19,6 +19,7 @@ enum DeviceDataType
 
 	Histogramm 	= 0x20,
 	Sigma		= 0x30,
+	ListItem	= 0x40,
 };
 
 enum ElementType
@@ -40,6 +41,8 @@ enum ElementType
 
 	BINS16 = 0x41,
 
+	SensorInfoItem = 0x51,
+
 };
 
 //template<typename T>
@@ -55,6 +58,15 @@ typedef struct
 	ElementType elementType;
 }DeviceDataParams;
 
+typedef struct
+{
+	double dist;
+	double pix_size;
+
+	unsigned int width;
+	unsigned int height;
+
+}SensorInfo;
 
 typedef boost::shared_ptr<void> DeviceDataPtr;
 

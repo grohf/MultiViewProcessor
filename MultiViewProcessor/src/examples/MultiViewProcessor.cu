@@ -43,6 +43,7 @@ int main(int argc, char **argv) {
 
 	ATrousFilter *atrousfilter = new ATrousFilter();
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
+	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
 
 	p.addFilter(FilterPtr(atrousfilter));
 

@@ -33,8 +33,10 @@ class FPFH: public Feature {
 		MeanHistogram2,
 
 		DivHistogram1,
+		DivHistogram2,
 
 		Sigma1,
+		Sigma2,
 
 
 		TestMap,
@@ -77,6 +79,7 @@ public:
 		divHistogramParams.dataType = Histogramm;
 
 		addTargetData(addDeviceDataRequest(divHistogramParams),DivHistogram1);
+		addTargetData(addDeviceDataRequest(divHistogramParams),DivHistogram2);
 
 		DeviceDataParams sigmaHistoparams;
 		sigmaHistoparams.elements = 1;
@@ -84,6 +87,15 @@ public:
 		sigmaHistoparams.elementType = FLOAT1;
 		sigmaHistoparams.dataType = Sigma;
 		addTargetData(addDeviceDataRequest(sigmaHistoparams),Sigma1);
+		addTargetData(addDeviceDataRequest(sigmaHistoparams),Sigma2);
+
+
+		DeviceDataParams PersitanceMapParams;
+		PersitanceMapParams.elements = 640*480;
+		PersitanceMapParams.element_size = sizeof(unsigned int);
+		PersitanceMapParams.elementType = UINT1;
+		PersitanceMapParams.dataType = Indice;
+		addTargetData(addDeviceDataRequest(PersitanceMapParams),PFPFHIndices);
 
 
 		DeviceDataParams TestMapParams;
@@ -92,6 +104,14 @@ public:
 		TestMapParams.elementType = UCHAR4;
 		TestMapParams.dataType = Point4D;
 		addTargetData(addDeviceDataRequest(TestMapParams),TestMap);
+
+
+		DeviceDataParams PFPFHparams;
+		PFPFHparams.elements = 640*480*8;
+		PFPFHparams.element_size = 8 * sizeof(float);
+		PFPFHparams.elementType = FLOAT1;
+		PFPFHparams.dataType = Histogramm;
+		addTargetData(addDeviceDataRequest(PFPFHparams),PFPFHistogram);
 
 	}
 	~FPFH(){

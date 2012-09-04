@@ -282,15 +282,22 @@ NormalPCAEstimator::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-/*
-	char path[50];
-	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-	checkCudaErrors(cudaMemcpy(h_f4_depth,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",0);
-	host::io::PCDIOController ioCtrl;
-	ioCtrl.writeASCIIPCDNormals(path,(float *)h_f4_depth,640*480);
-*/
+//	char path[50];
+//	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
+//	checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+//
+//	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",2);
+//	host::io::PCDIOController ioCtrl;
+//	ioCtrl.writeASCIIPCDNormals(path,(float *)h_f4_normals,640*480);
+//
+//	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+//	checkCudaErrors(cudaMemcpy(h_f4_depth,normalEstimator.input,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+//
+//	sprintf(path,"/home/avo/pcds/points_pca%d.pcd",2);
+//	ioCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+//
+
 	printf("normals done \n");
 }
 

@@ -20,6 +20,7 @@ public:
 	{
 		PointXYZI = 0,
 		PointRGBA = 1,
+		SensorInfoList = 2,
 	};
 
 	SyncFreenectSource();

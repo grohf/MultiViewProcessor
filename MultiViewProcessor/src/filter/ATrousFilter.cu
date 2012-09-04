@@ -24,6 +24,9 @@ namespace device
 
 		__constant__ unsigned int lx;
 		__constant__ unsigned int ly;
+
+		__constant__ double sensorInfo_pix_size;
+		__constant__ double sensorInfo_dist;
 	}
 }
 
@@ -209,9 +212,52 @@ namespace device
 	};
 
 	__global__ void filterAtrousKernel(const ATrousEnhancer128 ate){ ate (); }
+
+	struct CoordsUpdater
+	{
+
+		float4* pos;
+
+		__device__ __forceinline__ void
+		convertCXCYWZtoWXWYWZ(int cx,int cy, float wz, float &wx, float &wy) const
+		{
+
+			double factor = (constant::sensorInfo_pix_size * wz)  / constant::sensorInfo_dist;
+
+//			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
+//				printf("factor: %f ref_pix_size: %f ref_dist: %f \n",factor,constant::sensorInfo_pix_size,constant::sensorInfo_dist);
+
+			wx = (float) ((cx - 320) * factor);
+			wy = (float) ((cy - 240) * factor);
+
+		}
+
+		__device__ __forceinline__ void
+		operator () () const
+		{
+			int sx = blockIdx.x*blockDim.x+threadIdx.x;
+			int sy = blockIdx.y*blockDim.y+threadIdx.y;
+
+			int off = blockIdx.z*640*480+sy*640+sx;
+
+//			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
+//				printf(" %f %f %f \n",pos[off].x,pos[off].y,pos[off].z);
+
+			float4 wc = pos[off];
+			convertCXCYWZtoWXWYWZ(sx,sy,wc.z,wc.x,wc.y);
+			pos[off] = wc;
+
+//			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
+//				printf(" %f %f %f \n",pos[off].x,pos[off].y,pos[off].z);
+
+		}
+	};
+	__global__ void updateCoords(const CoordsUpdater cu){ cu (); }
+
 }
 
 device::ATrousEnhancer128 atrousfilter;
+device::CoordsUpdater coordsUpdater;
 
 void ATrousFilter::execute()
 {
@@ -220,26 +266,31 @@ void ATrousFilter::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	size_t uc4s = 640*480*sizeof(uchar4);
-//	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
-//	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
-//
-	char path[50];
-//	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
-//	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
-//
-	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-	checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+	device::updateCoords<<<grid,block>>>(coordsUpdater);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
 
-	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
-	for(int i=0;i<640*480;i++)
-	{
-		unsigned char g = h_f4_depth[i].z/20;
-		h_uc4_depth[i] = make_uchar4(g,g,g,128);
-	}
 
-	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
-	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
+//	size_t uc4s = 640*480*sizeof(uchar4);
+////	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
+////	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
+////
+//	char path[50];
+////	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
+////	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
+////
+//	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+//	checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+//
+//	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
+//	for(int i=0;i<640*480;i++)
+//	{
+//		unsigned char g = h_f4_depth[i].z/20;
+//		h_uc4_depth[i] = make_uchar4(g,g,g,128);
+//	}
+//
+//	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
+//	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 }
 
 
@@ -260,6 +311,17 @@ void ATrousFilter::init()
 
 	initAtrousConstants();
 
+	SensorInfo *d_sinfo = (SensorInfo *)getInputDataPointer(1);
+	cudaMemcpyToSymbol(device::constant::sensorInfo_pix_size,&(d_sinfo->pix_size),sizeof(double),0,cudaMemcpyDeviceToDevice);
+	cudaMemcpyToSymbol(device::constant::sensorInfo_dist,&(d_sinfo->dist),sizeof(double),0,cudaMemcpyDeviceToDevice);
+
+	SensorInfo h_sinfo;
+	checkCudaErrors(cudaMemcpy(&h_sinfo,d_sinfo,sizeof(SensorInfo),cudaMemcpyDeviceToHost));
+
+//	printf("host: pix_size: %f | dist %f \n",h_sinfo.pix_size,h_sinfo.dist);
+
+
+	coordsUpdater.pos = (float4 *)getTargetDataPointer(0);
 }
 
 void ATrousFilter::initAtrousConstants()

@@ -36,6 +36,11 @@ public:
 		addFilterInput(ddiPtr,0);
 	}
 
+	void setInputSensorInfo(DeviceDataInfoPtr ddiPtr)
+	{
+		addInputData(ddiPtr,1);
+	}
+
 	DeviceDataInfoPtr getFilteredWorldCoordinates()
 	{
 		return getTargetData(0);

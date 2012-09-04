@@ -29,6 +29,12 @@ namespace device
 		__constant__ double ref_dist;
 	}
 
+//	struct SensorInfoGenerator
+//	{
+//		SensorInfo *sinfo;
+//
+//	};
+
 	struct SyncFreenectLoader
 	{
 
@@ -114,6 +120,12 @@ SyncFreenectSource::init()
 	cudaMemcpyToSymbol(device::constant::ref_pix_size,&ref_pix_size,sizeof(double));
 	cudaMemcpyToSymbol(device::constant::ref_dist,&ref_dist,sizeof(double));
 
+	SensorInfo sinfo;
+	sinfo.pix_size = 2*ref_pix_size;
+	sinfo.dist = ref_dist;
+
+	SensorInfo *d_sinfoList = (SensorInfo *)getTargetDataPointer(SensorInfoList);
+	checkCudaErrors(cudaMemcpy(d_sinfoList,&sinfo,1*sizeof(SensorInfo),cudaMemcpyHostToDevice));
 }
 
 void
@@ -172,6 +184,14 @@ SyncFreenectSource::SyncFreenectSource()
 	pointRGBAParams.elementType = UCHAR4;
 
 	addTargetData(addDeviceDataRequest(pointRGBAParams),PointRGBA);
+
+	DeviceDataParams sensorInfoListParams;
+	sensorInfoListParams.elements = 1;
+	sensorInfoListParams.element_size = sizeof(SensorInfo);
+	sensorInfoListParams.dataType = ListItem;
+	sensorInfoListParams.elementType = SensorInfoItem;
+
+	addTargetData(addDeviceDataRequest(sensorInfoListParams),SensorInfoList);
 
 	setRegInfo();
 }
