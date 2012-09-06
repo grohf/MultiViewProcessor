@@ -51,12 +51,12 @@ namespace device
 }
 
 
-void init()
+void TransformCam2World::init()
 {
 
 }
 
-void execute()
+void TransformCam2World::execute()
 {
 
 }

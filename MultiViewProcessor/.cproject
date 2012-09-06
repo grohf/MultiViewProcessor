@@ -23,7 +23,7 @@
 					<folderInfo id="com.nvidia.cuda.ide.configuration.debug.2094567131." name="/" resourcePath="">
 						<toolChain id="com.nvidia.cuda.tools.toolchain.exe.debug.86822810" name="CUDA Toolkit 5.0" superClass="com.nvidia.cuda.tools.toolchain.exe.debug">
 							<targetPlatform archList="all" binaryParser="com.nvidia.cuda.ide.elf;com.nvidia.cuda.ide.macho;com.nvidia.cuda.ide.cubin" id="com.nvidia.cuda.ide.targetPlatform.306850875" isAbstract="false" name="Debug Platform" osList="linux,macosx" superClass="com.nvidia.cuda.ide.targetPlatform"/>
-							<builder buildPath="${workspace_loc:/MultiViewProcessor/Debug}" id="com.nvidia.cuda.ide.builder.1449039565" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="com.nvidia.cuda.ide.builder"/>
+							<builder buildPath="${workspace_loc:/MultiViewProcessor/Debug}" id="com.nvidia.cuda.ide.builder.1449039565" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CUDA Toolkit 5.0 Builder" superClass="com.nvidia.cuda.ide.builder"/>
 							<tool id="nvcc.compiler.base.934870997" name="NVCC Compiler" superClass="nvcc.compiler.base">
 								<option id="nvcc.compiler.deviceDebug.677520589" name="Generate device debug information (-G)" superClass="nvcc.compiler.deviceDebug" value="true" valueType="boolean"/>
 								<option id="nvcc.compiler.option.level.1309363020" name="Generate host debug information (-g)" superClass="nvcc.compiler.option.level" value="true" valueType="boolean"/>
@@ -33,9 +33,10 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/MultiViewProcessor/src/include}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
 								</option>
 								<option id="nvcc.compiler.maxregcount.1601824716" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
-								<option id="nvcc.compiler.usefastmath.1211152740" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
+								<option id="nvcc.compiler.usefastmath.1211152740" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
 								<inputType id="nvcc.compiler.input.cu.1126651958" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1591562129" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.993397056" superClass="nvcc.compiler.input.c"/>
@@ -90,7 +91,7 @@
 					<folderInfo id="com.nvidia.cuda.ide.configuration.release.1171689871." name="/" resourcePath="">
 						<toolChain id="com.nvidia.cuda.ide.toolchain.exe.release.1191225400" name="CUDA Toolkit 5.0" superClass="com.nvidia.cuda.ide.toolchain.exe.release">
 							<targetPlatform archList="all" binaryParser="com.nvidia.cuda.ide.elf;com.nvidia.cuda.ide.macho;com.nvidia.cuda.ide.cubin" id="com.nvidia.cuda.ide.targetPlatform.1792192348" isAbstract="false" name="Debug Platform" osList="linux,macosx" superClass="com.nvidia.cuda.ide.targetPlatform"/>
-							<builder buildPath="${workspace_loc:/MultiViewProcessor/Release}" id="com.nvidia.cuda.ide.builder.759425779" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="com.nvidia.cuda.ide.builder"/>
+							<builder buildPath="${workspace_loc:/MultiViewProcessor/Release}" id="com.nvidia.cuda.ide.builder.759425779" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CUDA Toolkit 5.0 Builder" superClass="com.nvidia.cuda.ide.builder"/>
 							<tool id="nvcc.compiler.base.919459099" name="NVCC Compiler" superClass="nvcc.compiler.base">
 								<option id="nvcc.compiler.deviceDebug.1367622631" name="Generate device debug information (-G)" superClass="nvcc.compiler.deviceDebug"/>
 								<option id="nvcc.compiler.option.level.984179107" name="Generate host debug information (-g)" superClass="nvcc.compiler.option.level"/>
@@ -100,6 +101,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/MultiViewProcessor/src/include}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
 								</option>
 								<inputType id="nvcc.compiler.input.cu.279360062" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.656687760" superClass="nvcc.compiler.input.cpp"/>

@@ -27,12 +27,13 @@
 #include "../filter/ATrousFilter.h"
 #include "../feature/NormalPCAEstimator.h"
 #include "../feature/FPFH.h"
+#include "../feature/SVDEstimatorCPU.h"
+#include "../feature/RigidBodyTransformationEstimator.h"
 
 /**
  * Host function that prepares data array and passes it to the CUDA kernel.
  */
 int main(int argc, char **argv) {
-
 
 	SyncFreenectSource *src = new SyncFreenectSource();
 //	SourcePtr src(new SyncFreenectSource());
@@ -40,6 +41,8 @@ int main(int argc, char **argv) {
 	Processor p;
 	p.setSource(SourcePtr(src));
 
+//	SVDEstimator_CPU *svd_cpu = new SVDEstimator_CPU();
+//	p.addFeature(svd_cpu);
 
 	ATrousFilter *atrousfilter = new ATrousFilter();
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
@@ -58,9 +61,13 @@ int main(int argc, char **argv) {
 
 	p.addFeature(fpfhEstimator);
 
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator();
+	p.addFeature(rbEstimator);
+
 //	FilterPtr fp = atrousfilter->ptr;
 
 	p.start();
+
 
 	src->~SyncFreenectSource();
 
