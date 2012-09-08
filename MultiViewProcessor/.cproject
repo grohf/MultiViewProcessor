@@ -45,6 +45,7 @@
 								<option id="nvcc.linker.option.libs.880590786" name="Libraries (-l)" superClass="nvcc.linker.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="freenect_sync"/>
 									<listOptionValue builtIn="false" value="freenect"/>
+									<listOptionValue builtIn="false" value="curand"/>
 								</option>
 								<inputType id="nvcc.linker.input.1718933632" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -111,6 +112,7 @@
 								<option id="nvcc.linker.option.libs.486180969" name="Libraries (-l)" superClass="nvcc.linker.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="freenect_sync"/>
 									<listOptionValue builtIn="false" value="freenect"/>
+									<listOptionValue builtIn="false" value="curand"/>
 								</option>
 								<inputType id="nvcc.linker.input.760090362" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

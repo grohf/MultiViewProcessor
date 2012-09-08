@@ -66,7 +66,7 @@ typedef struct
 	unsigned int width;
 	unsigned int height;
 
-}SensorInfo;
+} SensorInfo;
 
 typedef boost::shared_ptr<void> DeviceDataPtr;
 

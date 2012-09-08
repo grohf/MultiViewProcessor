@@ -8,6 +8,14 @@
 #include "FPFH.h"
 #include <helper_cuda.h>
 #include <helper_image.h>
+
+#include <thrust/remove.h>
+
+#include <thrust/device_ptr.h>
+#include <thrust/device_malloc.h>
+#include <thrust/device_free.h>
+
+
 #include "../sink/pcd_io.h"
 #include "utils.hpp"
 
@@ -883,7 +891,7 @@ void FPFH::init()
 	block = dim3(32,24);
 	grid = dim3(640/block.x,480/block.y);
 
-
+	d_infoList = (unsigned int*)getTargetDataPointer(PFPFHInfoList);
 }
 
 void FPFH::execute()
@@ -893,7 +901,12 @@ void FPFH::execute()
 
 	checkCudaErrors(cudaMemset(getTargetDataPointer(PFPFHIndices),640*480,640*480*sizeof(unsigned int)));
 
-	for(int v=0;v<1;v++)
+	unsigned int max_views = 1;
+
+	float h_pInfo[1+max_views];
+	h_pInfo[0] = max_views;
+
+	for(int v=0;v<max_views;v++)
 	{
 		dim3 meanblock(32*32);
 		bool toggle = true;
@@ -993,10 +1006,17 @@ void FPFH::execute()
 
 		}
 
+		thrust::device_ptr<unsigned int> idx_ptr = thrust::device_pointer_cast(pfpfhEstimator.output_persistence_map);
+		thrust::device_ptr<unsigned int> end = thrust::remove(idx_ptr,idx_ptr+640*480,640*480);
+
+		printf("persistance count: %d \n",(unsigned int)(end-idx_ptr));
+
+		h_pInfo[v+1]=(unsigned int)(end-idx_ptr);
+
 
 	}
+	checkCudaErrors(cudaMemcpy(d_infoList,h_pInfo,1+max_views*sizeof(unsigned int),cudaMemcpyHostToDevice));
 	printf("fpfh done... \n");
-
 }
 
 

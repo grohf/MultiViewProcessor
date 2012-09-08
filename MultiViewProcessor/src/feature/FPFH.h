@@ -41,12 +41,15 @@ class FPFH: public Feature {
 
 		TestMap,
 
-		PFPFHistogram,
+//		PFPFHistogram,
 		PFPFHIndices,
+		PFPFHInfoList,
 	};
 
 	dim3 block;
 	dim3 grid;
+
+	unsigned int *d_infoList;
 
 public:
 	FPFH() {
@@ -106,12 +109,19 @@ public:
 		addTargetData(addDeviceDataRequest(TestMapParams),TestMap);
 
 
-		DeviceDataParams PFPFHparams;
-		PFPFHparams.elements = 640*480*8;
-		PFPFHparams.element_size = 8 * sizeof(float);
-		PFPFHparams.elementType = FLOAT1;
-		PFPFHparams.dataType = Histogramm;
-		addTargetData(addDeviceDataRequest(PFPFHparams),PFPFHistogram);
+//		DeviceDataParams PFPFHparams;
+//		PFPFHparams.elements = 640*480*8;
+//		PFPFHparams.element_size = 8 * sizeof(float);
+//		PFPFHparams.elementType = FLOAT1;
+//		PFPFHparams.dataType = Histogramm;
+//		addTargetData(addDeviceDataRequest(PFPFHparams),PFPFHistogram);
+
+		DeviceDataParams PersistanceInfoListParams;
+		PersistanceInfoListParams.elements = 1+8;
+		PersistanceInfoListParams.element_size = sizeof(unsigned int);
+		PersistanceInfoListParams.elementType = UINT1;
+		PersistanceInfoListParams.dataType = ListItem;
+		addTargetData(addDeviceDataRequest(PersistanceInfoListParams),PFPFHInfoList);
 
 	}
 	~FPFH(){
@@ -143,7 +153,12 @@ public:
 
 	DeviceDataInfoPtr getFPFH()
 	{
-		return getTargetData(PFPFHistogram);
+		return getTargetData(FPFHistogram2);
+	}
+
+	DeviceDataInfoPtr getPersistanceIndexList()
+	{
+		return getTargetData(PFPFHIndices);
 	}
 };
 
