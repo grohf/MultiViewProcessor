@@ -897,13 +897,15 @@ void FPFH::init()
 void FPFH::execute()
 {
 
+	printf("d_infoList: %d \n",d_infoList);
+
 	float radii[] = {15.0f,20.f,25.f};
 
 	checkCudaErrors(cudaMemset(getTargetDataPointer(PFPFHIndices),640*480,640*480*sizeof(unsigned int)));
 
 	unsigned int max_views = 1;
 
-	float h_pInfo[1+max_views];
+	unsigned int *h_pInfo = (unsigned int *)malloc((1+max_views)*sizeof(unsigned int));
 	h_pInfo[0] = max_views;
 
 	for(int v=0;v<max_views;v++)
@@ -1009,13 +1011,11 @@ void FPFH::execute()
 		thrust::device_ptr<unsigned int> idx_ptr = thrust::device_pointer_cast(pfpfhEstimator.output_persistence_map);
 		thrust::device_ptr<unsigned int> end = thrust::remove(idx_ptr,idx_ptr+640*480,640*480);
 
-		printf("persistance count: %d \n",(unsigned int)(end-idx_ptr));
-
 		h_pInfo[v+1]=(unsigned int)(end-idx_ptr);
-
+		printf("persistance count: %d \n",h_pInfo[v+1]);
 
 	}
-	checkCudaErrors(cudaMemcpy(d_infoList,h_pInfo,1+max_views*sizeof(unsigned int),cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy(d_infoList,h_pInfo,(1+max_views)*sizeof(unsigned int),cudaMemcpyHostToDevice));
 	printf("fpfh done... \n");
 }
 

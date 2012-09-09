@@ -15,7 +15,8 @@ class RigidBodyTransformationEstimator : public Feature {
 	enum Input
 	{
 		IdxList,
-		HistogramMap
+		HistogramMap,
+		InfoList,
 	};
 
 	dim3 grid;
@@ -36,6 +37,11 @@ public:
 	void setPersistanceHistogramMap(DeviceDataInfoPtr phMap)
 	{
 		addInputData(phMap,HistogramMap);
+	}
+
+	void setPersistenceInfoList(DeviceDataInfoPtr pInfoList)
+	{
+		addInputData(pInfoList,InfoList);
 	}
 };
 

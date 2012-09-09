@@ -160,6 +160,11 @@ public:
 	{
 		return getTargetData(PFPFHIndices);
 	}
+
+	DeviceDataInfoPtr getPersistenceInfoList()
+	{
+		return getTargetData(PFPFHInfoList);
+	}
 };
 
 #endif /* FPFH_H_ */

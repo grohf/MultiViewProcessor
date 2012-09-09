@@ -30,11 +30,9 @@
 #include "../feature/SVDEstimatorCPU.h"
 #include "../feature/RigidBodyTransformationEstimator.h"
 
-/**
- * Host function that prepares data array and passes it to the CUDA kernel.
- */
-int main(int argc, char **argv) {
 
+void runTestProcessor()
+{
 	SyncFreenectSource *src = new SyncFreenectSource();
 //	SourcePtr src(new SyncFreenectSource());
 
@@ -62,15 +60,33 @@ int main(int argc, char **argv) {
 	p.addFeature(fpfhEstimator);
 
 	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator();
+	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
+	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
+	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
 	p.addFeature(rbEstimator);
 
 //	FilterPtr fp = atrousfilter->ptr;
 
 	p.start();
 
-
 	src->~SyncFreenectSource();
 
+}
 
+void coorespTest()
+{
+	SyncFreenectSource *src = new SyncFreenectSource();
+//	SourcePtr src(new SyncFreenectSource());
+
+	Processor p;
+	p.setSource(SourcePtr(src));
+}
+
+/**
+ * Host function that prepares data array and passes it to the CUDA kernel.
+ */
+int main(int argc, char **argv) {
+
+	runTestProcessor();
 	return 0;
 }
