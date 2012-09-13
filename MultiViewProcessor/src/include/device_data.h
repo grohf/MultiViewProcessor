@@ -20,6 +20,7 @@ enum DeviceDataType
 	Histogramm 	= 0x20,
 	Sigma		= 0x30,
 	ListItem	= 0x40,
+	Matrix = 0x50,
 };
 
 enum ElementType

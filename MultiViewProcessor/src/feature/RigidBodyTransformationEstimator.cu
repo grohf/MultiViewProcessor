@@ -10,6 +10,7 @@
 
 #include "SVDEstimatorCPU.h"
 #include "RigidBodyTransformationEstimator.h"
+#include "utils.hpp"
 
 
 #define CURAND_CALL ( x ) do { if (( x ) != CURAND_STATUS_SUCCESS ) { \
@@ -30,13 +31,122 @@ namespace device
 
 	};
 
+	struct RigidBodyTransformationMatrixEstimator
+	{
+		enum
+		{
+			kernels = 1,
+		};
+
+		unsigned int n_ransac;
+
+		float *input_correletationmatrices;
+		float *output_rotationMatrices;
+		float *output_translationVector;
+
+		__device__ __forceinline__ void
+		operator () () const
+		{
+			float m[9];
+			for(int d=0;d<9;d++)
+			{
+				m[d] = input_correletationmatrices[d*n_ransac+blockIdx.x*blockDim.x+threadIdx.x];
+			}
+
+			float cov[6];
+			cov[0] = m[0]*m[0] + m[1]*m[1] + m[2]*m[2];
+			cov[1] = m[0]*m[3] + m[1]*m[4] + m[2]*m[5];
+			cov[2] = m[0]*m[6] + m[1]*m[7] + m[2]*m[8];
+
+			cov[3] = m[3]*m[3] + m[4]*m[4] + m[5]*m[5];
+			cov[4] = m[3]*m[6] + m[4]*m[7] + m[5]*m[8];
+
+			cov[5] = m[6]*m[6] + m[7]*m[7] + m[8]*m[8];
+
+			typedef Eigen33::Mat33 Mat33;
+			Eigen33 eigen33(cov);
+
+			Mat33 tmp;
+			Mat33 vec_tmp;
+			Mat33 evecs;
+			float3 evals;
+
+			eigen33.compute(tmp, vec_tmp, evecs, evals);
+
+			if(evals.x==0 || evals.y == 0 || evals.z == 0)
+			{
+				output_rotationMatrices[blockIdx.x*n_ransac+blockIdx.x*blockDim.x+threadIdx.x] = -1.f;
+				return;
+			}
+
+			for(int i=0;i<3;i++)
+			{
+				tmp[i].x = 0;
+				tmp[i].y = 0;
+				tmp[i].z = 0;
+
+				vec_tmp[i].x = 0;
+				vec_tmp[i].y = 0;
+				vec_tmp[i].z = 0;
+			}
+
+			float eval_sqrt = sqrtf(evals.x);
+
+			tmp[0].x += (evecs[0].x*evecs[0].x)/eval_sqrt;
+			tmp[1].x += (evecs[0].x*evecs[0].y)/eval_sqrt;
+			tmp[2].x += (evecs[0].x*evecs[0].z)/eval_sqrt;
+
+			tmp[0].y += (evecs[0].y*evecs[0].x)/eval_sqrt;
+			tmp[1].y += (evecs[0].y*evecs[0].y)/eval_sqrt;
+			tmp[2].y += (evecs[0].y*evecs[0].z)/eval_sqrt;
+
+			tmp[0].z += (evecs[0].z*evecs[0].x)/eval_sqrt;
+			tmp[1].z += (evecs[0].z*evecs[0].y)/eval_sqrt;
+			tmp[2].z += (evecs[0].z*evecs[0].z)/eval_sqrt;
+
+			eval_sqrt = sqrtf(evals.y);
+			tmp[0].x += (evecs[1].x*evecs[1].x)/eval_sqrt;
+			tmp[1].x += (evecs[1].x*evecs[1].y)/eval_sqrt;
+			tmp[2].x += (evecs[1].x*evecs[1].z)/eval_sqrt;
+
+			tmp[0].y += (evecs[1].y*evecs[1].x)/eval_sqrt;
+			tmp[1].y += (evecs[1].y*evecs[1].y)/eval_sqrt;
+			tmp[2].y += (evecs[1].y*evecs[1].z)/eval_sqrt;
+
+			tmp[0].z += (evecs[1].z*evecs[1].x)/eval_sqrt;
+			tmp[1].z += (evecs[1].z*evecs[1].y)/eval_sqrt;
+			tmp[2].z += (evecs[1].z*evecs[1].z)/eval_sqrt;
+
+			eval_sqrt = sqrtf(evals.z);
+			tmp[0].x += (evecs[2].x*evecs[2].x)/eval_sqrt;
+			tmp[1].x += (evecs[2].x*evecs[2].y)/eval_sqrt;
+			tmp[2].x += (evecs[2].x*evecs[2].z)/eval_sqrt;
+
+			tmp[0].y += (evecs[2].y*evecs[2].x)/eval_sqrt;
+			tmp[1].y += (evecs[2].y*evecs[2].y)/eval_sqrt;
+			tmp[2].y += (evecs[2].y*evecs[2].z)/eval_sqrt;
+
+			tmp[0].z += (evecs[2].z*evecs[2].x)/eval_sqrt;
+			tmp[1].z += (evecs[2].z*evecs[2].y)/eval_sqrt;
+			tmp[2].z += (evecs[2].z*evecs[2].z)/eval_sqrt;
+
+
+
+		}
+
+	};
 
 	struct DeMeanedCorrelationMatrixEstimator
 	{
 		enum
 		{
-			n = 32,
-			warps = 32,
+			threads = 512,
+			n_corresp = 8,
+			n_matrices = threads/n_corresp,
+
+			WARP_SIZE = 32,
+			groups_per_warp = WARP_SIZE/n_corresp,
+			group_length = WARP_SIZE/groups_per_warp,
 		};
 
 		unsigned int view_src;
@@ -55,20 +165,369 @@ namespace device
 		unsigned int n_src;
 		unsigned int n_target;
 
+		unsigned int n_rsac;
 		float *output_correlationMatrixes;
+
+		float *output_transformationMatrices;
 
 		__device__ __forceinline__ void
 		operator () () const
 		{
-			__shared__ float ps_x[n*warps];
-			__shared__ float ps_y[n*warps];
-			__shared__ float ps_z[n*warps];
+			__shared__ float points[threads*6];
+//			__shared__ float ps_y[n_matrices*n_corresp];
+//			__shared__ float ps_z[n_matrices*n_corresp];
 
-			__shared__ float pt_x[n*warps];
-			__shared__ float pt_y[n*warps];
-			__shared__ float pt_z[n*warps];
+//			__shared__ float points_target[n_matrices*n_corresp*3];
+//			__shared__ float pt_y[n_matrices*n_corresp];
+//			__shared__ float pt_z[n_matrices*n_corresp];
+
+//			__shared__ float b_x[n_matrices*n_corresp];
+//			__shared__ float b_y[n_matrices*n_corresp];
+//			__shared__ float b_z[n_matrices*n_corresp];
+
+			__shared__ float buffer[threads];
+
+//			__shared__ float c_x[n_matrices];
+//			__shared__ float c_y[n_matrices];
+//			__shared__ float c_z[n_matrices];
+
+			__shared__ float centroids[n_matrices*6];
+			__shared__ float matricesH[n_matrices*9];
+
+//			unsigned int tid = threadIdx.x;
+
+//			for(int i=threadIdx.x; i<n_matrices*n_corresp;i+=blockDim.x)
+			{
+				unsigned int tid = threadIdx.x;
+				unsigned int idx = (unsigned int)(rnd_src[blockIdx.x*threads+tid]*n_src);
+				unsigned int pidx = correspondanceIdxList[idx];
+				float4 tmp = pos[view_src*640*480+pidx];
+				points[threads*0 + tid] = tmp.x;
+				points[threads*1 + tid] = tmp.y;
+				points[threads*2 + tid] = tmp.z;
 
 
+				pidx = correspondanceErrorIdxList[idx*n_target + (unsigned int)(rnd_target[blockIdx.x*threads+tid]*n_target)];
+				tmp = pos[view_target*640*480+pidx];
+				points[threads*3 + tid] = tmp.x;
+				points[threads*4 + tid] = tmp.y;
+				points[threads*5 + tid] = tmp.z;
+
+
+//				points[threads*0 + tid] = tid;
+//				points[threads*1 + tid] = tid;
+//				points[threads*2 + tid] = tid;
+//				points[threads*3 + tid] = tid;
+//				points[threads*4 + tid] = tid;
+//				points[threads*5 + tid] = tid;
+
+			}
+			__syncthreads(); //TODO: necessary?
+
+//			__syncthreads();
+//			if(blockIdx.x == 0 && threadIdx.x==0)
+//			{
+//				for(int i=0;i<32;i++)
+//				{
+//					printf("(%d) %f | ",i,points[i]);
+//				}
+//				printf(" \n");
+//			}
+
+
+
+//			unsigned int gid = threadIdx.x/n_corresp;
+//			unsigned int tid = threadIdx.x - gid * n_corresp;
+
+			unsigned int wid = threadIdx.x/WARP_SIZE;
+			unsigned int wtid = threadIdx.x - wid * WARP_SIZE;
+			unsigned int gid = wtid/group_length;
+			unsigned int gtid = wtid - gid * group_length;
+
+//			unsigned int stride = groups_per_warp*2;
+
+//			if(threadIdx.x==0)
+//				printf("groups per warp: %d | stride: %d \n",groups_per_warp,stride);
+
+//			//TEST
+//			if(blockIdx.x == 0 && threadIdx.x<WARP_SIZE)
+//			{
+//				ps_x[threadIdx.x] = threadIdx.x;
+//				ps_y[threadIdx.x] = threadIdx.x;
+//				ps_z[threadIdx.x] = threadIdx.x;
+//
+//				pt_x[threadIdx.x] = threadIdx.x+100;
+//				pt_y[threadIdx.x] = threadIdx.x+100;
+//				pt_z[threadIdx.x] = threadIdx.x+100;
+//
+//			}
+
+//			if(wtid<(WARP_SIZE/2))
+//			{
+//				unsigned int pos = wid*32 + wgid*stride + gtid;
+////				unsigned int pos_load = wid*32+
+//				b_x[pos] = ps_x[wid*32+wtid*2] + ps_x[wid*32+wtid*2+1];
+//				b_y[pos] = ps_y[wid*32+wtid*2] + ps_y[wid*32+wtid*2+1];
+//				b_z[pos] = ps_z[wid*32+wtid*2] + ps_z[wid*32+wtid*2+1];
+//
+//			}
+//			else
+//			{
+//				unsigned int pos = wid*32 + ( (wtid-(WARP_SIZE/2))/groups_per_warp)*stride + groups_per_warp + gtid;
+//
+//				b_x[pos] = pt_x[wid*32 + (wtid-WARP_SIZE/2)*2] + pt_x[wid*32 + (wtid-WARP_SIZE/2)*2+1];
+//				b_y[pos] = pt_y[wid*32 + (wtid-WARP_SIZE/2)*2] + pt_y[wid*32 + (wtid-WARP_SIZE/2)*2+1];
+//				b_z[pos] = pt_z[wid*32 + (wtid-WARP_SIZE/2)*2] + pt_z[wid*32 + (wtid-WARP_SIZE/2)*2+1];
+//
+//			}
+
+//			__syncthreads();
+//			if(blockIdx.x == 0 && threadIdx.x==0)
+//			{
+//				for(int i=0;i<n_matrices*n_corresp/32;i++)
+//				{
+//					for(int w=0;w<32;w++)
+//					{
+//						printf(" %f | ", b_x[i*32+w]);
+//					}
+//				printf(" \n ");
+//
+//				}
+//			}
+
+			for(int d=0;d<6;d++)
+			{
+
+				buffer[threadIdx.x] = points[d*blockDim.x+threadIdx.x];
+				__syncthreads();
+
+				volatile float *warpLine = &buffer[wid*WARP_SIZE];
+
+				if(gtid < 16){
+					unsigned int posb = gid * group_length;
+					if(groups_per_warp<=1) 	warpLine[posb + gtid] += warpLine[posb + gtid + 16];
+					if(groups_per_warp<=2) 	warpLine[posb + gtid] += warpLine[posb + gtid + 8];
+					if(groups_per_warp<=4) 	warpLine[posb + gtid] += warpLine[posb + gtid + 4];
+					if(groups_per_warp<=8) 	warpLine[posb + gtid] += warpLine[posb + gtid + 2];
+					if(groups_per_warp<=16) warpLine[posb + gtid] += warpLine[posb + gtid + 1];
+
+	//				if(groups_per_warp*2 <= 8) warpLine[wtid] += warpLine[wtid + 8];
+	//				if(groups_per_warp*2 <= 4) warpLine[wtid] += warpLine[wtid + 4];
+	//				if(groups_per_warp*2 <= 2) warpLine[wtid] += warpLine[wtid + 2];
+	//				if(groups_per_warp < 2) warpLine[wtid] += warpLine[wtid + 1];
+					if(gtid<groups_per_warp)
+					{
+						centroids[d*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length]/group_length;
+					}
+				}
+			}
+			__syncthreads();
+
+//			if(blockIdx.x == 0 && threadIdx.x==0)
+//			{
+//				for(int d=0;d<2;d++)
+//				{
+//					for(int l=0;l<2;l++)
+//					{
+//						printf("l: %d \n",l);
+//						for(int w=0;w<groups_per_warp;w++)
+//						{
+//							printf("%f | ", centroids[d*n_matrices + l*groups_per_warp+w]);
+//						}
+//						printf(" \n ");
+//					}
+//				}
+//			}
+
+			points[threads*0 + threadIdx.x] -= centroids[0*n_matrices+wid*groups_per_warp+gid];
+			points[threads*1 + threadIdx.x] -= centroids[1*n_matrices+wid*groups_per_warp+gid];
+			points[threads*2 + threadIdx.x] -= centroids[2*n_matrices+wid*groups_per_warp+gid];
+
+			points[threads*3 + threadIdx.x] -= centroids[3*n_matrices+wid*groups_per_warp+gid];
+			points[threads*4 + threadIdx.x] -= centroids[4*n_matrices+wid*groups_per_warp+gid];
+			points[threads*5 + threadIdx.x] -= centroids[5*n_matrices+wid*groups_per_warp+gid];
+
+//			__syncthreads();
+//			if(blockIdx.x == 0 && threadIdx.x==0)
+//			{
+//				for(int i=0;i<36;i++)
+//				{
+//					printf("(%d) %f | ",i,points[i]);
+//				}
+//				printf(" \n ");
+//			}
+
+
+			__syncthreads();
+			for(int sd=0;sd<3;sd++)
+			{
+				for(int td=0;td<3;td++)
+				{
+
+					buffer[threadIdx.x] = points[sd*threads+threadIdx.x] * points[(3+td)*threads+threadIdx.x];
+					__syncthreads();
+
+//					if(threadIdx.x==32 && sd==0 && td==0)
+//					{
+//						for(int i=32;i<48;i++)
+//						{
+//							printf("i: %d -> %f = %f * %f \n",i,buffer[i],points[sd*threads+i],points[(3+td)*threads+i]);
+//						}
+//					}
+
+					volatile float *warpLine = &buffer[wid*WARP_SIZE];
+					if(gtid < 16){
+						unsigned int posb = gid * group_length;
+						if(groups_per_warp<=1) 	warpLine[posb + gtid] += warpLine[posb + gtid + 16];
+						if(groups_per_warp<=2) 	warpLine[posb + gtid] += warpLine[posb + gtid + 8];
+						if(groups_per_warp<=4) 	warpLine[posb + gtid] += warpLine[posb + gtid + 4];
+						if(groups_per_warp<=8) 	warpLine[posb + gtid] += warpLine[posb + gtid + 2];
+						if(groups_per_warp<=16) warpLine[posb + gtid] += warpLine[posb + gtid + 1];
+
+
+						if(gtid<groups_per_warp)
+						{
+//							if(gtid==0 && sd==0 && td==0)
+//								printf("r: %f | gtid: %d \n",warpLine[gtid*group_length],gtid);
+
+							output_correlationMatrixes[ (sd*3+td)*n_rsac+blockIdx.x*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
+							matricesH[(sd*3+td)*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
+//							if(blockIdx.x == 0 && threadIdx.x==0)
+//							{
+//								for(int i=0;i<groups_per_warp;i++)
+//								{
+//									printf("(%d) %f | ",i,warpLine[gtid*group_length]);
+//								}
+//								printf(" \n");
+//							}
+
+						}
+					}
+
+				}
+
+
+			}
+
+			__syncthreads();
+
+			//Calculate TransformationMatrix via OM
+			if(threadIdx.x<n_matrices)
+			{
+			/*
+
+			float cov[6];
+			cov[0] = m[0]*m[0] + m[1]*m[1] + m[2]*m[2];
+			cov[1] = m[0]*m[3] + m[1]*m[4] + m[2]*m[5];
+			cov[2] = m[0]*m[6] + m[1]*m[7] + m[2]*m[8];
+
+			cov[3] = m[3]*m[3] + m[4]*m[4] + m[5]*m[5];
+			cov[4] = m[3]*m[6] + m[4]*m[7] + m[5]*m[8];
+
+			cov[5] = m[6]*m[6] + m[7]*m[7] + m[8]*m[8];
+
+			 */
+
+				volatile float *cov = &points[threadIdx.x*6];
+
+
+				cov[0] = matricesH[0*n_matrices + threadIdx.x]*matricesH[0*n_matrices + threadIdx.x] + matricesH[1*n_matrices + threadIdx.x]*matricesH[1*n_matrices + threadIdx.x] + matricesH[2*n_matrices + threadIdx.x]*matricesH[2*n_matrices + threadIdx.x];
+				cov[1] = matricesH[0*n_matrices + threadIdx.x]*matricesH[3*n_matrices + threadIdx.x] + matricesH[1*n_matrices + threadIdx.x]*matricesH[4*n_matrices + threadIdx.x] + matricesH[2*n_matrices + threadIdx.x]*matricesH[5*n_matrices + threadIdx.x];
+				cov[2] = matricesH[0*n_matrices + threadIdx.x]*matricesH[6*n_matrices + threadIdx.x] + matricesH[1*n_matrices + threadIdx.x]*matricesH[7*n_matrices + threadIdx.x] + matricesH[2*n_matrices + threadIdx.x]*matricesH[8*n_matrices + threadIdx.x];
+
+				cov[3] = matricesH[3*n_matrices + threadIdx.x]*matricesH[3*n_matrices + threadIdx.x] + matricesH[4*n_matrices + threadIdx.x]*matricesH[4*n_matrices + threadIdx.x] + matricesH[5*n_matrices + threadIdx.x]*matricesH[5*n_matrices + threadIdx.x];
+				cov[4] = matricesH[3*n_matrices + threadIdx.x]*matricesH[6*n_matrices + threadIdx.x] + matricesH[4*n_matrices + threadIdx.x]*matricesH[7*n_matrices + threadIdx.x] + matricesH[5*n_matrices + threadIdx.x]*matricesH[8*n_matrices + threadIdx.x];
+
+				cov[5] = matricesH[6*n_matrices + threadIdx.x]*matricesH[6*n_matrices + threadIdx.x] + matricesH[7*n_matrices + threadIdx.x]*matricesH[7*n_matrices + threadIdx.x] + matricesH[8*n_matrices + threadIdx.x]*matricesH[8*n_matrices + threadIdx.x];
+
+                typedef Eigen33::Mat33 Mat33;
+                Eigen33 eigen33(cov);
+
+                Mat33& tmp = (Mat33&)points[n_matrices*6+threadIdx.x*9];
+                Mat33& vec_tmp = (Mat33&)points[n_matrices*(6+9)+threadIdx.x*9];
+                Mat33& evecs   = (Mat33&)points[n_matrices*(6*18)+threadIdx.x*9];
+                float3 evals;
+
+                eigen33.compute(tmp, vec_tmp, evecs, evals);
+
+    			if(evals.x==0 || evals.y == 0 || evals.z == 0)
+    			{
+    				output_transformationMatrices[blockIdx.x*n_rsac+blockIdx.x*n_matrices+threadIdx.x] = -1.f;
+    				return;
+    			}
+
+    			for(int i=0;i<3;i++)
+    			{
+    				tmp[i].x = 0;
+    				tmp[i].y = 0;
+    				tmp[i].z = 0;
+
+    				vec_tmp[i].x = 0;
+    				vec_tmp[i].y = 0;
+    				vec_tmp[i].z = 0;
+    			}
+			/*
+
+
+			float eval_sqrt = sqrtf(evals.x);
+
+			tmp[0].x += (evecs[0].x*evecs[0].x)/eval_sqrt;
+			tmp[1].x += (evecs[0].x*evecs[0].y)/eval_sqrt;
+			tmp[2].x += (evecs[0].x*evecs[0].z)/eval_sqrt;
+
+			tmp[0].y += (evecs[0].y*evecs[0].x)/eval_sqrt;
+			tmp[1].y += (evecs[0].y*evecs[0].y)/eval_sqrt;
+			tmp[2].y += (evecs[0].y*evecs[0].z)/eval_sqrt;
+
+			tmp[0].z += (evecs[0].z*evecs[0].x)/eval_sqrt;
+			tmp[1].z += (evecs[0].z*evecs[0].y)/eval_sqrt;
+			tmp[2].z += (evecs[0].z*evecs[0].z)/eval_sqrt;
+
+			eval_sqrt = sqrtf(evals.y);
+			tmp[0].x += (evecs[1].x*evecs[1].x)/eval_sqrt;
+			tmp[1].x += (evecs[1].x*evecs[1].y)/eval_sqrt;
+			tmp[2].x += (evecs[1].x*evecs[1].z)/eval_sqrt;
+
+			tmp[0].y += (evecs[1].y*evecs[1].x)/eval_sqrt;
+			tmp[1].y += (evecs[1].y*evecs[1].y)/eval_sqrt;
+			tmp[2].y += (evecs[1].y*evecs[1].z)/eval_sqrt;
+
+			tmp[0].z += (evecs[1].z*evecs[1].x)/eval_sqrt;
+			tmp[1].z += (evecs[1].z*evecs[1].y)/eval_sqrt;
+			tmp[2].z += (evecs[1].z*evecs[1].z)/eval_sqrt;
+
+			eval_sqrt = sqrtf(evals.z);
+			tmp[0].x += (evecs[2].x*evecs[2].x)/eval_sqrt;
+			tmp[1].x += (evecs[2].x*evecs[2].y)/eval_sqrt;
+			tmp[2].x += (evecs[2].x*evecs[2].z)/eval_sqrt;
+
+			tmp[0].y += (evecs[2].y*evecs[2].x)/eval_sqrt;
+			tmp[1].y += (evecs[2].y*evecs[2].y)/eval_sqrt;
+			tmp[2].y += (evecs[2].y*evecs[2].z)/eval_sqrt;
+
+			tmp[0].z += (evecs[2].z*evecs[2].x)/eval_sqrt;
+			tmp[1].z += (evecs[2].z*evecs[2].y)/eval_sqrt;
+			tmp[2].z += (evecs[2].z*evecs[2].z)/eval_sqrt;
+
+
+			 */
+
+			}
+
+
+//			for(int i=threadIdx.x; i<n_matrices*n_corresp;i+=blockDim.x)
+//			{
+//				unsigned int idx = correspondanceErrorIdxList[(unsigned int)(rnd_target[blockDim.x*n_matrices*n_corresp+i]*n_target)];
+//				float4 tmp = pos[view_target*640*480+idx];
+//				ps_x[i] = tmp.x;
+//				ps_y[i] = tmp.y;
+//				ps_z[i] = tmp.z;
+//
+//				b_x[i] = tmp.x;
+//				b_y[i] = tmp.y;
+//				b_z[i] = tmp.z;
+//
+//			}
 
 
 		}
@@ -205,8 +664,8 @@ namespace device
 				shm_local_idx[threadIdx.x] = idx;
 				output_s_idx[blockIdx.x*sp+threadIdx.x] = idx;
 
-				if(threadIdx.x==10)
-					printf("rnd: %f idx_pos: %d idx: %d \n",f,(unsigned int)(f*infoList[view_src+1]),idx);
+//				if(threadIdx.x==10)
+//					printf("rnd: %f idx_pos: %d idx: %d \n",f,(unsigned int)(f*infoList[view_src+1]),idx);
 
 			}
 			__syncthreads();
@@ -532,6 +991,9 @@ namespace device
 
 	};
 	__global__ void estimateCorrespondance(const SKCorrespondanceEstimator<8> ce) {ce (); }
+
+
+
 }
 
 device::SKCorrespondanceEstimator<8> correspondanceEstimator;
@@ -563,7 +1025,7 @@ void RigidBodyTransformationEstimator::init()
 	block = dim3(correspondanceEstimator.sp*correspondanceEstimator.k,1);
 	grid = dim3(s/correspondanceEstimator.sp,1);
 
-	deMeanedCorrelatonMEstimator.pos = (float4 *)getTargetDataPointer(Coordiantes);
+	deMeanedCorrelatonMEstimator.pos = (float4 *)getInputDataPointer(Coordiantes);
 
 	deMeanedCorrelatonMEstimator.correspondanceErrorIdxList = (unsigned int *)getTargetDataPointer(ProbIdxList);
 	deMeanedCorrelatonMEstimator.correspondanceErrorList = (float *)getTargetDataPointer(ProbList);
@@ -571,9 +1033,14 @@ void RigidBodyTransformationEstimator::init()
 
 	deMeanedCorrelatonMEstimator.n_src = s;
 	deMeanedCorrelatonMEstimator.n_target = k;
-	deMeanedCorrelatonMEstimator.rnd_src = (float *)getTargetDataPointer(RndIndices);
-	deMeanedCorrelatonMEstimator.rnd_target = (float *)getTargetDataPointer(RndIndices2);
+	deMeanedCorrelatonMEstimator.rnd_src = (float *)getTargetDataPointer(RndSrcIndices);
+	deMeanedCorrelatonMEstimator.rnd_target = (float *)getTargetDataPointer(RndTargetIndices);
 
+	deMeanedCorrelatonMEstimator.n_rsac = rn;
+	deMeanedCorrelatonMEstimator.output_correlationMatrixes = (float *)getTargetDataPointer(CorrelationMatrices);
+
+	deMeanBlock = dim3(deMeanedCorrelatonMEstimator.threads,1);
+	deMeanGrid = dim3(rn/deMeanedCorrelatonMEstimator.n_matrices,1);
 }
 
 void RigidBodyTransformationEstimator::execute()
@@ -596,6 +1063,31 @@ void RigidBodyTransformationEstimator::execute()
 	checkCudaErrors(cudaDeviceSynchronize());
 
 
+
+	checkCudaErrors(curandGenerateUniform(gen,deMeanedCorrelatonMEstimator.rnd_src,rn));
+	checkCudaErrors(curandGenerateUniform(gen,deMeanedCorrelatonMEstimator.rnd_target,rn));
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	deMeanedCorrelatonMEstimator.view_src = 0;
+	deMeanedCorrelatonMEstimator.view_target = 0;
+	device::estimateCorrelationMatrix<<<deMeanGrid,deMeanBlock>>>(deMeanedCorrelatonMEstimator);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	float *h_corrmatrices = (float *)malloc(rn*9*sizeof(float));
+	checkCudaErrors( cudaMemcpy(h_corrmatrices,deMeanedCorrelatonMEstimator.output_correlationMatrixes,rn*9*sizeof(float),cudaMemcpyDeviceToHost));
+
+	int off = 5;
+	for(int j=0;j<3;j++)
+	{
+		for(int i=0;i<3;i++)
+		{
+			float p = h_corrmatrices[(j*3+i)*rn+0];
+			printf("%f ",p);
+		}
+		printf("\n");
+	}
 
 	/*
 	float *h_tmp = (float *)malloc(s*k*sizeof(float));

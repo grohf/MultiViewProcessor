@@ -59,10 +59,11 @@ void runTestProcessor()
 
 	p.addFeature(fpfhEstimator);
 
-	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(1024,32);
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(64,1024,32);
 	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
 	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
 	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
+	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(rbEstimator);
 
 //	FilterPtr fp = atrousfilter->ptr;

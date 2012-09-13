@@ -26,8 +26,10 @@ class RigidBodyTransformationEstimator : public Feature {
 		ProbList,
 		ProbIdxList,
 		RndIndices,
-		RndIndices2,
+		RndSrcIndices,
+		RndTargetIndices,
 		SIndices,
+		CorrelationMatrices,
 	};
 
 	dim3 grid;
@@ -36,6 +38,9 @@ class RigidBodyTransformationEstimator : public Feature {
 	unsigned int s;
 	unsigned int k;
 	unsigned int rn;
+
+	dim3 deMeanGrid;
+	dim3 deMeanBlock;
 
 	curandGenerator_t gen ;
 	float *d_rnd_data;
@@ -69,12 +74,12 @@ public:
 		addTargetData(addDeviceDataRequest(rndParams),RndIndices);
 
 		DeviceDataParams rndParams2;
-		rndParams2.elements = s;
+		rndParams2.elements = rn*s*k;
 		rndParams2.element_size = sizeof(float);
 		rndParams2.elementType = FLOAT1;
 		rndParams2.dataType = Indice;
-		addTargetData(addDeviceDataRequest(rndParams2),RndIndices2);
-
+		addTargetData(addDeviceDataRequest(rndParams2),RndSrcIndices);
+		addTargetData(addDeviceDataRequest(rndParams2),RndTargetIndices);
 
 		DeviceDataParams sIdxParams;
 		sIdxParams.elements = s;
@@ -84,7 +89,13 @@ public:
 		addTargetData(addDeviceDataRequest(sIdxParams),SIndices);
 
 		DeviceDataParams correlationmatrixesParams;
-		correlationmatrixesParams.elements = s;
+		correlationmatrixesParams.elements = rn;
+		correlationmatrixesParams.element_size = 9 * sizeof(float);
+		correlationmatrixesParams.elementType = FLOAT1;
+		correlationmatrixesParams.dataType = Matrix;
+		addTargetData(addDeviceDataRequest(correlationmatrixesParams),CorrelationMatrices);
+
+
 
 	}
 	virtual ~RigidBodyTransformationEstimator() { }
