@@ -30,6 +30,8 @@ class RigidBodyTransformationEstimator : public Feature {
 		RndTargetIndices,
 		SIndices,
 		CorrelationMatrices,
+		TransformationMatrices,
+		TransformationMetaDataList,
 	};
 
 	dim3 grid;
@@ -88,6 +90,8 @@ public:
 		sIdxParams.dataType = Indice;
 		addTargetData(addDeviceDataRequest(sIdxParams),SIndices);
 
+
+		//TODO: multiply with views
 		DeviceDataParams correlationmatrixesParams;
 		correlationmatrixesParams.elements = rn;
 		correlationmatrixesParams.element_size = 9 * sizeof(float);
@@ -95,7 +99,20 @@ public:
 		correlationmatrixesParams.dataType = Matrix;
 		addTargetData(addDeviceDataRequest(correlationmatrixesParams),CorrelationMatrices);
 
+		DeviceDataParams transformationmatrixesParams;
+		transformationmatrixesParams.elements = rn;
+		transformationmatrixesParams.element_size = 12 * sizeof(float);
+		transformationmatrixesParams.elementType = FLOAT1;
+		transformationmatrixesParams.dataType = Matrix;
+		addTargetData(addDeviceDataRequest(transformationmatrixesParams),TransformationMatrices);
 
+
+		DeviceDataParams transformationMetaDataList;
+		transformationMetaDataList.elements = rn;
+		transformationMetaDataList.element_size = 4 * sizeof(int);
+		transformationMetaDataList.elementType = TransformationInfoListItem;
+		transformationMetaDataList.dataType = Indice;
+		addTargetData(addDeviceDataRequest(transformationMetaDataList),TransformationMetaDataList);
 
 	}
 	virtual ~RigidBodyTransformationEstimator() { }

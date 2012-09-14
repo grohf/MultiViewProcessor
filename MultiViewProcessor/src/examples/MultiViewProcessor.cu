@@ -59,7 +59,7 @@ void runTestProcessor()
 
 	p.addFeature(fpfhEstimator);
 
-	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(64,1024,32);
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(256,64,32);
 	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
 	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
 	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());

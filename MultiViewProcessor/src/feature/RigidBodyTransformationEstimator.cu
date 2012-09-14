@@ -169,6 +169,7 @@ namespace device
 		float *output_correlationMatrixes;
 
 		float *output_transformationMatrices;
+		int *output_transformationMetaData;
 
 		__device__ __forceinline__ void
 		operator () () const
@@ -202,6 +203,7 @@ namespace device
 				unsigned int idx = (unsigned int)(rnd_src[blockIdx.x*threads+tid]*n_src);
 				unsigned int pidx = correspondanceIdxList[idx];
 				float4 tmp = pos[view_src*640*480+pidx];
+//				points[threads*0 + tid] = idx;
 				points[threads*0 + tid] = tmp.x;
 				points[threads*1 + tid] = tmp.y;
 				points[threads*2 + tid] = tmp.z;
@@ -224,10 +226,13 @@ namespace device
 			}
 			__syncthreads(); //TODO: necessary?
 
+
+
+
 //			__syncthreads();
 //			if(blockIdx.x == 0 && threadIdx.x==0)
 //			{
-//				for(int i=0;i<32;i++)
+//				for(int i=0;i<threads;i++)
 //				{
 //					printf("(%d) %f | ",i,points[i]);
 //				}
@@ -243,7 +248,7 @@ namespace device
 			unsigned int wtid = threadIdx.x - wid * WARP_SIZE;
 			unsigned int gid = wtid/group_length;
 			unsigned int gtid = wtid - gid * group_length;
-
+/*
 //			unsigned int stride = groups_per_warp*2;
 
 //			if(threadIdx.x==0)
@@ -294,6 +299,7 @@ namespace device
 //
 //				}
 //			}
+*/
 
 			for(int d=0;d<6;d++)
 			{
@@ -412,24 +418,11 @@ namespace device
 			__syncthreads();
 
 			//Calculate TransformationMatrix via OM
+//			if(threadIdx.x<n_matrices)
 			if(threadIdx.x<n_matrices)
 			{
-			/*
-
-			float cov[6];
-			cov[0] = m[0]*m[0] + m[1]*m[1] + m[2]*m[2];
-			cov[1] = m[0]*m[3] + m[1]*m[4] + m[2]*m[5];
-			cov[2] = m[0]*m[6] + m[1]*m[7] + m[2]*m[8];
-
-			cov[3] = m[3]*m[3] + m[4]*m[4] + m[5]*m[5];
-			cov[4] = m[3]*m[6] + m[4]*m[7] + m[5]*m[8];
-
-			cov[5] = m[6]*m[6] + m[7]*m[7] + m[8]*m[8];
-
-			 */
-
+//				printf("%d \n",threadIdx.x);
 				volatile float *cov = &points[threadIdx.x*6];
-
 
 				cov[0] = matricesH[0*n_matrices + threadIdx.x]*matricesH[0*n_matrices + threadIdx.x] + matricesH[1*n_matrices + threadIdx.x]*matricesH[1*n_matrices + threadIdx.x] + matricesH[2*n_matrices + threadIdx.x]*matricesH[2*n_matrices + threadIdx.x];
 				cov[1] = matricesH[0*n_matrices + threadIdx.x]*matricesH[3*n_matrices + threadIdx.x] + matricesH[1*n_matrices + threadIdx.x]*matricesH[4*n_matrices + threadIdx.x] + matricesH[2*n_matrices + threadIdx.x]*matricesH[5*n_matrices + threadIdx.x];
@@ -440,19 +433,26 @@ namespace device
 
 				cov[5] = matricesH[6*n_matrices + threadIdx.x]*matricesH[6*n_matrices + threadIdx.x] + matricesH[7*n_matrices + threadIdx.x]*matricesH[7*n_matrices + threadIdx.x] + matricesH[8*n_matrices + threadIdx.x]*matricesH[8*n_matrices + threadIdx.x];
 
+//				if()
+
                 typedef Eigen33::Mat33 Mat33;
                 Eigen33 eigen33(cov);
 
-                Mat33& tmp = (Mat33&)points[n_matrices*6+threadIdx.x*9];
-                Mat33& vec_tmp = (Mat33&)points[n_matrices*(6+9)+threadIdx.x*9];
-                Mat33& evecs   = (Mat33&)points[n_matrices*(6*18)+threadIdx.x*9];
+                Mat33& tmp 		= (Mat33&)points[n_matrices*6+threadIdx.x*9];
+                Mat33& vec_tmp 	= (Mat33&)points[n_matrices*(6+9)+threadIdx.x*9];
+                Mat33& evecs 	= (Mat33&)points[n_matrices*(6+18)+threadIdx.x*9];
                 float3 evals;
 
                 eigen33.compute(tmp, vec_tmp, evecs, evals);
 
     			if(evals.x==0 || evals.y == 0 || evals.z == 0)
     			{
-    				output_transformationMatrices[blockIdx.x*n_rsac+blockIdx.x*n_matrices+threadIdx.x] = -1.f;
+    				printf("out: %d \n",threadIdx.x);
+
+//    				output_transformationMatrices[blockIdx.x*n_rsac+threadIdx.x] = -1.f;
+
+    				output_transformationMetaData[blockIdx.x*n_matrices+threadIdx.x] = -1;
+    				output_transformationMetaData[n_rsac + blockIdx.x*n_matrices +threadIdx.x] = -1;
     				return;
     			}
 
@@ -466,11 +466,7 @@ namespace device
     				vec_tmp[i].y = 0;
     				vec_tmp[i].z = 0;
     			}
-			/*
-
-
-			float eval_sqrt = sqrtf(evals.x);
-
+/*
 			tmp[0].x += (evecs[0].x*evecs[0].x)/eval_sqrt;
 			tmp[1].x += (evecs[0].x*evecs[0].y)/eval_sqrt;
 			tmp[2].x += (evecs[0].x*evecs[0].z)/eval_sqrt;
@@ -482,37 +478,125 @@ namespace device
 			tmp[0].z += (evecs[0].z*evecs[0].x)/eval_sqrt;
 			tmp[1].z += (evecs[0].z*evecs[0].y)/eval_sqrt;
 			tmp[2].z += (evecs[0].z*evecs[0].z)/eval_sqrt;
+*/
+			float eval_sqrt = sqrtf(evals.x);
+			tmp[0].x += (evecs[0].x*evecs[0].x)/eval_sqrt;
+			tmp[0].y += (evecs[0].x*evecs[0].y)/eval_sqrt;
+			tmp[0].z += (evecs[0].x*evecs[0].z)/eval_sqrt;
+
+			tmp[1].x += (evecs[0].y*evecs[0].x)/eval_sqrt;
+			tmp[1].y += (evecs[0].y*evecs[0].y)/eval_sqrt;
+			tmp[1].z += (evecs[0].y*evecs[0].z)/eval_sqrt;
+
+			tmp[2].x += (evecs[0].z*evecs[0].x)/eval_sqrt;
+			tmp[2].y += (evecs[0].z*evecs[0].y)/eval_sqrt;
+			tmp[2].z += (evecs[0].z*evecs[0].z)/eval_sqrt;
 
 			eval_sqrt = sqrtf(evals.y);
 			tmp[0].x += (evecs[1].x*evecs[1].x)/eval_sqrt;
-			tmp[1].x += (evecs[1].x*evecs[1].y)/eval_sqrt;
-			tmp[2].x += (evecs[1].x*evecs[1].z)/eval_sqrt;
+			tmp[0].y += (evecs[1].x*evecs[1].y)/eval_sqrt;
+			tmp[0].z += (evecs[1].x*evecs[1].z)/eval_sqrt;
 
-			tmp[0].y += (evecs[1].y*evecs[1].x)/eval_sqrt;
+			tmp[1].x += (evecs[1].y*evecs[1].x)/eval_sqrt;
 			tmp[1].y += (evecs[1].y*evecs[1].y)/eval_sqrt;
-			tmp[2].y += (evecs[1].y*evecs[1].z)/eval_sqrt;
+			tmp[1].z += (evecs[1].y*evecs[1].z)/eval_sqrt;
 
-			tmp[0].z += (evecs[1].z*evecs[1].x)/eval_sqrt;
-			tmp[1].z += (evecs[1].z*evecs[1].y)/eval_sqrt;
+			tmp[2].x += (evecs[1].z*evecs[1].x)/eval_sqrt;
+			tmp[2].y += (evecs[1].z*evecs[1].y)/eval_sqrt;
 			tmp[2].z += (evecs[1].z*evecs[1].z)/eval_sqrt;
 
 			eval_sqrt = sqrtf(evals.z);
 			tmp[0].x += (evecs[2].x*evecs[2].x)/eval_sqrt;
-			tmp[1].x += (evecs[2].x*evecs[2].y)/eval_sqrt;
-			tmp[2].x += (evecs[2].x*evecs[2].z)/eval_sqrt;
+			tmp[0].y += (evecs[2].x*evecs[2].y)/eval_sqrt;
+			tmp[0].z += (evecs[2].x*evecs[2].z)/eval_sqrt;
 
-			tmp[0].y += (evecs[2].y*evecs[2].x)/eval_sqrt;
+			tmp[1].x += (evecs[2].y*evecs[2].x)/eval_sqrt;
 			tmp[1].y += (evecs[2].y*evecs[2].y)/eval_sqrt;
-			tmp[2].y += (evecs[2].y*evecs[2].z)/eval_sqrt;
+			tmp[1].z += (evecs[2].y*evecs[2].z)/eval_sqrt;
 
-			tmp[0].z += (evecs[2].z*evecs[2].x)/eval_sqrt;
-			tmp[1].z += (evecs[2].z*evecs[2].y)/eval_sqrt;
+			tmp[2].x += (evecs[2].z*evecs[2].x)/eval_sqrt;
+			tmp[2].y += (evecs[2].z*evecs[2].y)/eval_sqrt;
 			tmp[2].z += (evecs[2].z*evecs[2].z)/eval_sqrt;
 
+			vec_tmp[0].x = matricesH[0*n_matrices + threadIdx.x]*tmp[0].x + matricesH[3*n_matrices + threadIdx.x]*tmp[1].x + matricesH[6*n_matrices + threadIdx.x]*tmp[2].x;
+			vec_tmp[0].y = matricesH[0*n_matrices + threadIdx.x]*tmp[0].y + matricesH[3*n_matrices + threadIdx.x]*tmp[1].y + matricesH[6*n_matrices + threadIdx.x]*tmp[2].y;
+			vec_tmp[0].z = matricesH[0*n_matrices + threadIdx.x]*tmp[0].z + matricesH[3*n_matrices + threadIdx.x]*tmp[1].z + matricesH[6*n_matrices + threadIdx.x]*tmp[2].z;
 
-			 */
+			vec_tmp[1].x = matricesH[1*n_matrices + threadIdx.x]*tmp[0].x + matricesH[4*n_matrices + threadIdx.x]*tmp[1].x + matricesH[7*n_matrices + threadIdx.x]*tmp[2].x;
+			vec_tmp[1].y = matricesH[1*n_matrices + threadIdx.x]*tmp[0].y + matricesH[4*n_matrices + threadIdx.x]*tmp[1].y + matricesH[7*n_matrices + threadIdx.x]*tmp[2].y;
+			vec_tmp[1].z = matricesH[1*n_matrices + threadIdx.x]*tmp[0].z + matricesH[4*n_matrices + threadIdx.x]*tmp[1].z + matricesH[7*n_matrices + threadIdx.x]*tmp[2].z;
 
-			}
+			vec_tmp[2].x = matricesH[2*n_matrices + threadIdx.x]*tmp[0].x + matricesH[5*n_matrices + threadIdx.x]*tmp[1].x + matricesH[8*n_matrices + threadIdx.x]*tmp[2].x;
+			vec_tmp[2].y = matricesH[2*n_matrices + threadIdx.x]*tmp[0].y + matricesH[5*n_matrices + threadIdx.x]*tmp[1].y + matricesH[8*n_matrices + threadIdx.x]*tmp[2].y;
+			vec_tmp[2].z = matricesH[2*n_matrices + threadIdx.x]*tmp[0].z + matricesH[5*n_matrices + threadIdx.x]*tmp[1].z + matricesH[8*n_matrices + threadIdx.x]*tmp[2].z;
+
+//			if(blockIdx.x==0) printf("%d \n",threadIdx.x);
+
+//			float det = 0.f;
+//			det += vec_tmp[0].x * vec_tmp[1].y * vec_tmp[2].z;
+//			det += vec_tmp[0].y * vec_tmp[1].z * vec_tmp[2].x;
+//			det += vec_tmp[0].z * vec_tmp[1].x * vec_tmp[2].y;
+//
+//			det -= vec_tmp[0].z * vec_tmp[1].y * vec_tmp[2].x;
+//			det -= vec_tmp[0].y * vec_tmp[1].x * vec_tmp[2].z;
+//			det -= vec_tmp[0].x * vec_tmp[1].z * vec_tmp[2].y;
+//
+//			int ret = (det < 0.9f || det > 1.1f)?(int)-1:(int)(blockIdx.x*n_matrices+threadIdx.x);
+//
+//			output_transformationMetaData[blockIdx.x*n_matrices+threadIdx.x] = ret;
+//			output_transformationMetaData[n_rsac + blockIdx.x*n_matrices +threadIdx.x] = ret;
+//
+//			if(ret==-1)
+//				return;
+//
+//
+//			output_transformationMatrices[0*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].x;
+//			output_transformationMatrices[1*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].y;
+//			output_transformationMatrices[2*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].z;
+//
+//			output_transformationMatrices[3*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].x;
+//			output_transformationMatrices[4*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].y;
+//			output_transformationMatrices[5*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].z;
+//
+//			output_transformationMatrices[6*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].x;
+//			output_transformationMatrices[7*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].y;
+//			output_transformationMatrices[8*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].z;
+//
+//
+//			output_transformationMatrices[9*n_rsac 	+ blockIdx.x*n_matrices +threadIdx.x]  	= centroids[3*n_matrices+threadIdx.x] - (vec_tmp[0].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[0].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[0].z*centroids[2*n_matrices+threadIdx.x]);
+//			output_transformationMatrices[10*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[4*n_matrices+threadIdx.x] - (vec_tmp[1].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[1].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[1].z*centroids[2*n_matrices+threadIdx.x]);
+//			output_transformationMatrices[11*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[5*n_matrices+threadIdx.x] - (vec_tmp[2].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[2].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[2].z*centroids[2*n_matrices+threadIdx.x]);
+
+//			printf("(%d) det: %f \n",threadIdx.x,det);
+
+//			__syncthreads();
+//			if(threadIdx.x==0 && blockIdx.x==0)
+//			{
+////				printf("R: %d \n",n_matrices);
+////				for(int j=0;j<3;j++)
+////				{
+////					printf("%f | %f | %f \n",vec_tmp[j].x,vec_tmp[j].y,vec_tmp[j].z);
+////				}
+//
+//				for(int i=0;i<n_matrices;i++)
+//				{
+//	                Mat33& r 	= (Mat33&)points[n_matrices*(6+9)+i*9];
+//
+//				float det = 0.f;
+//				det += r[0].x * r[1].y * r[2].z;
+//				det += r[0].y * r[1].z * r[2].x;
+//				det += r[0].z * r[1].x * r[2].y;
+//
+//				det -= r[0].z * r[1].y * r[2].x;
+//				det -= r[0].y * r[1].x * r[2].z;
+//				det -= r[0].x * r[1].z * r[2].y;
+//
+//				printf("(%d) det: %f \n",i,det);
+//				}
+//
+//			}
+
+		}
 
 
 //			for(int i=threadIdx.x; i<n_matrices*n_corresp;i+=blockDim.x)
@@ -1038,6 +1122,8 @@ void RigidBodyTransformationEstimator::init()
 
 	deMeanedCorrelatonMEstimator.n_rsac = rn;
 	deMeanedCorrelatonMEstimator.output_correlationMatrixes = (float *)getTargetDataPointer(CorrelationMatrices);
+	deMeanedCorrelatonMEstimator.output_transformationMatrices = (float *)getTargetDataPointer(TransformationMatrices);
+	deMeanedCorrelatonMEstimator.output_transformationMetaData = (int *)getTargetDataPointer(TransformationMetaDataList);
 
 	deMeanBlock = dim3(deMeanedCorrelatonMEstimator.threads,1);
 	deMeanGrid = dim3(rn/deMeanedCorrelatonMEstimator.n_matrices,1);
@@ -1064,8 +1150,8 @@ void RigidBodyTransformationEstimator::execute()
 
 
 
-	checkCudaErrors(curandGenerateUniform(gen,deMeanedCorrelatonMEstimator.rnd_src,rn));
-	checkCudaErrors(curandGenerateUniform(gen,deMeanedCorrelatonMEstimator.rnd_target,rn));
+	checkCudaErrors(curandGenerateUniform(gen,deMeanedCorrelatonMEstimator.rnd_src,rn*s*k));
+	checkCudaErrors(curandGenerateUniform(gen,deMeanedCorrelatonMEstimator.rnd_target,rn*s*k));
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -1078,16 +1164,20 @@ void RigidBodyTransformationEstimator::execute()
 	float *h_corrmatrices = (float *)malloc(rn*9*sizeof(float));
 	checkCudaErrors( cudaMemcpy(h_corrmatrices,deMeanedCorrelatonMEstimator.output_correlationMatrixes,rn*9*sizeof(float),cudaMemcpyDeviceToHost));
 
-	int off = 5;
-	for(int j=0;j<3;j++)
-	{
-		for(int i=0;i<3;i++)
-		{
-			float p = h_corrmatrices[(j*3+i)*rn+0];
-			printf("%f ",p);
-		}
-		printf("\n");
-	}
+
+//	for(int off=0;off<64;off++)
+//	{
+//		for(int j=0;j<3;j++)
+//		{
+//			for(int i=0;i<3;i++)
+//			{
+//				float p = h_corrmatrices[(j*3+i)*rn+off];
+//				printf("%f ",p);
+//			}
+//			printf(" | ");
+//		}
+//		printf("\n");
+//	}
 
 	/*
 	float *h_tmp = (float *)malloc(s*k*sizeof(float));

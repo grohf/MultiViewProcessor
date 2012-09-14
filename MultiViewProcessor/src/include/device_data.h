@@ -43,6 +43,7 @@ enum ElementType
 	BINS16 = 0x41,
 
 	SensorInfoItem = 0x51,
+	TransformationInfoListItem = 0x60,
 
 };
 
