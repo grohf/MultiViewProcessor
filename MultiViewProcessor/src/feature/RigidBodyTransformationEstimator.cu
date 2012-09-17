@@ -532,42 +532,48 @@ namespace device
 
 //			if(blockIdx.x==0) printf("%d \n",threadIdx.x);
 
-//			float det = 0.f;
-//			det += vec_tmp[0].x * vec_tmp[1].y * vec_tmp[2].z;
-//			det += vec_tmp[0].y * vec_tmp[1].z * vec_tmp[2].x;
-//			det += vec_tmp[0].z * vec_tmp[1].x * vec_tmp[2].y;
-//
-//			det -= vec_tmp[0].z * vec_tmp[1].y * vec_tmp[2].x;
-//			det -= vec_tmp[0].y * vec_tmp[1].x * vec_tmp[2].z;
-//			det -= vec_tmp[0].x * vec_tmp[1].z * vec_tmp[2].y;
-//
-//			int ret = (det < 0.9f || det > 1.1f)?(int)-1:(int)(blockIdx.x*n_matrices+threadIdx.x);
-//
-//			output_transformationMetaData[blockIdx.x*n_matrices+threadIdx.x] = ret;
-//			output_transformationMetaData[n_rsac + blockIdx.x*n_matrices +threadIdx.x] = ret;
-//
-//			if(ret==-1)
-//				return;
-//
-//
-//			output_transformationMatrices[0*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].x;
-//			output_transformationMatrices[1*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].y;
-//			output_transformationMatrices[2*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].z;
-//
-//			output_transformationMatrices[3*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].x;
-//			output_transformationMatrices[4*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].y;
-//			output_transformationMatrices[5*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].z;
-//
-//			output_transformationMatrices[6*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].x;
-//			output_transformationMatrices[7*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].y;
-//			output_transformationMatrices[8*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].z;
-//
-//
-//			output_transformationMatrices[9*n_rsac 	+ blockIdx.x*n_matrices +threadIdx.x]  	= centroids[3*n_matrices+threadIdx.x] - (vec_tmp[0].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[0].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[0].z*centroids[2*n_matrices+threadIdx.x]);
-//			output_transformationMatrices[10*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[4*n_matrices+threadIdx.x] - (vec_tmp[1].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[1].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[1].z*centroids[2*n_matrices+threadIdx.x]);
-//			output_transformationMatrices[11*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[5*n_matrices+threadIdx.x] - (vec_tmp[2].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[2].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[2].z*centroids[2*n_matrices+threadIdx.x]);
+			float det = 0.f;
+			det += vec_tmp[0].x * vec_tmp[1].y * vec_tmp[2].z;
+			det += vec_tmp[0].y * vec_tmp[1].z * vec_tmp[2].x;
+			det += vec_tmp[0].z * vec_tmp[1].x * vec_tmp[2].y;
 
-//			printf("(%d) det: %f \n",threadIdx.x,det);
+			det -= vec_tmp[0].z * vec_tmp[1].y * vec_tmp[2].x;
+			det -= vec_tmp[0].y * vec_tmp[1].x * vec_tmp[2].z;
+			det -= vec_tmp[0].x * vec_tmp[1].z * vec_tmp[2].y;
+
+			int ret = (det < 0.9f || det > 1.1f)?(int)-1:(int)(blockIdx.x*n_matrices+threadIdx.x);
+
+			output_transformationMetaData[blockIdx.x*n_matrices+threadIdx.x] = ret;
+			output_transformationMetaData[n_rsac + blockIdx.x*n_matrices +threadIdx.x] = ret;
+
+			if(ret==-1)
+				return;
+
+
+			output_transformationMatrices[0*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].x;
+			output_transformationMatrices[1*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].y;
+			output_transformationMatrices[2*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[0].z;
+
+			output_transformationMatrices[3*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].x;
+			output_transformationMatrices[4*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].y;
+			output_transformationMatrices[5*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[1].z;
+
+			output_transformationMatrices[6*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].x;
+			output_transformationMatrices[7*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].y;
+			output_transformationMatrices[8*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].z;
+
+
+			output_transformationMatrices[9*n_rsac 	+ blockIdx.x*n_matrices +threadIdx.x]  	= centroids[3*n_matrices+threadIdx.x] - (vec_tmp[0].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[0].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[0].z*centroids[2*n_matrices+threadIdx.x]);
+			output_transformationMatrices[10*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[4*n_matrices+threadIdx.x] - (vec_tmp[1].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[1].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[1].z*centroids[2*n_matrices+threadIdx.x]);
+			output_transformationMatrices[11*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[5*n_matrices+threadIdx.x] - (vec_tmp[2].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[2].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[2].z*centroids[2*n_matrices+threadIdx.x]);
+
+			printf("(%d) det: %f \n",threadIdx.x,det);
+
+//			__syncthreads();
+//			if(threadIdx.x==0 && blockIdx.x==0)
+//			{
+//
+//			}
 
 //			__syncthreads();
 //			if(threadIdx.x==0 && blockIdx.x==0)
@@ -1143,7 +1149,7 @@ void RigidBodyTransformationEstimator::execute()
 
 
 	correspondanceEstimator.view_src = 0;
-	correspondanceEstimator.view_target = 0;
+	correspondanceEstimator.view_target = 1;
 	device::estimateCorrespondance<<<grid,block>>>(correspondanceEstimator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());

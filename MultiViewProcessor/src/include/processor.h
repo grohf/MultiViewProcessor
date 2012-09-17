@@ -79,21 +79,25 @@ private:
 
 	void allocateDeviceMemory()
 	{
+		unsigned int amount = 0;
 		for(int i=0;i<memList.size();i++)
 		{
 			DeviceDataInfoPtr ddip = memList[i];
 			DeviceDataParams params = ddip->getDeviceDataParams();
-			printf("i:%d | %d | %d \n",i,params.elements,params.element_size);
+			printf("i:%d | elements: %d | element_size: %d \n",i,params.elements,params.element_size);
 
 			void* d;
 
 			checkCudaErrors(cudaMalloc((void**)&d,params.elements*params.element_size));
+			amount += params.elements*params.element_size;
 
 			ddip->setDeviceDataPtr(DeviceDataPtr(d));
 
 
-			printf("allocated DeviceDataType: %d \n",params.dataType);
+//			printf("allocated DeviceDataType: %d \n",params.dataType);
 		}
+
+		printf("allocated Memory: %f MB \n", ((float)amount)/(1024.f*1024.f));
 	}
 };
 

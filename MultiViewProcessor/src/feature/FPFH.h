@@ -46,17 +46,32 @@ class FPFH: public Feature {
 		PFPFHInfoList,
 	};
 
+
 	dim3 block;
 	dim3 grid;
 
 	unsigned int *d_infoList;
+	unsigned int n_view;
+
 
 public:
-	FPFH() {
+
+	enum BinType
+	{
+		BinQuantums2 = 8,
+		BinQuantums3 = 27,
+		BinQuantums4 = 64,
+		BinQuantums5 = 125,
+	};
+
+	FPFH(unsigned int n_view_) {
+
+		n_view = n_view_;
+		quantum = BinQuantums2;
 
 		DeviceDataParams params;
-		params.elements = 640*480;
-		params.element_size = 8 * sizeof(float);
+		params.elements = 640*480*n_view;
+		params.element_size = quantum * sizeof(float);
 		params.elementType = FLOAT1;
 		params.dataType = Histogramm;
 
@@ -67,7 +82,7 @@ public:
 		addTargetData(addDeviceDataRequest(params),FPFHistogram2);
 
 		DeviceDataParams meanHistoparams;
-		meanHistoparams.elements = 8;
+		meanHistoparams.elements = quantum*n_view;
 		meanHistoparams.element_size = sizeof(float);
 		meanHistoparams.elementType = FLOAT1;
 		meanHistoparams.dataType = Histogramm;
@@ -76,7 +91,7 @@ public:
 		addTargetData(addDeviceDataRequest(meanHistoparams),MeanHistogram2);
 
 		DeviceDataParams divHistogramParams;
-		divHistogramParams.elements = 640*480;
+		divHistogramParams.elements = 640*480*n_view;
 		divHistogramParams.element_size = sizeof(float);
 		divHistogramParams.elementType = FLOAT1;
 		divHistogramParams.dataType = Histogramm;
@@ -85,7 +100,7 @@ public:
 		addTargetData(addDeviceDataRequest(divHistogramParams),DivHistogram2);
 
 		DeviceDataParams sigmaHistoparams;
-		sigmaHistoparams.elements = 1;
+		sigmaHistoparams.elements = 1*n_view;
 		sigmaHistoparams.element_size = sizeof(float);
 		sigmaHistoparams.elementType = FLOAT1;
 		sigmaHistoparams.dataType = Sigma;
@@ -94,7 +109,7 @@ public:
 
 
 		DeviceDataParams PersitanceMapParams;
-		PersitanceMapParams.elements = 640*480;
+		PersitanceMapParams.elements = 640*480*n_view;
 		PersitanceMapParams.element_size = sizeof(unsigned int);
 		PersitanceMapParams.elementType = UINT1;
 		PersitanceMapParams.dataType = Indice;
@@ -102,7 +117,7 @@ public:
 
 
 		DeviceDataParams TestMapParams;
-		TestMapParams.elements = 640*480;
+		TestMapParams.elements = 640*480*n_view;
 		TestMapParams.element_size = sizeof(uchar4);
 		TestMapParams.elementType = UCHAR4;
 		TestMapParams.dataType = Point4D;
@@ -117,7 +132,7 @@ public:
 //		addTargetData(addDeviceDataRequest(PFPFHparams),PFPFHistogram);
 
 		DeviceDataParams PersistanceInfoListParams;
-		PersistanceInfoListParams.elements = 1+8;
+		PersistanceInfoListParams.elements = 1+n_view;
 		PersistanceInfoListParams.element_size = sizeof(unsigned int);
 		PersistanceInfoListParams.elementType = UINT1;
 		PersistanceInfoListParams.dataType = ListItem;
@@ -165,6 +180,9 @@ public:
 	{
 		return getTargetData(PFPFHInfoList);
 	}
+
+private:
+	BinType quantum;
 };
 
 #endif /* FPFH_H_ */

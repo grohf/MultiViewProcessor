@@ -15,6 +15,8 @@ class NormalPCAEstimator : public Feature {
 	dim3 grid;
 	dim3 block;
 
+	unsigned int n_view;
+
 	enum Target
 	{
 		Normals
@@ -27,7 +29,7 @@ class NormalPCAEstimator : public Feature {
 
 public:
 
-	NormalPCAEstimator();
+	NormalPCAEstimator(unsigned int n_view_);
 	virtual ~NormalPCAEstimator();
 
 	void execute();

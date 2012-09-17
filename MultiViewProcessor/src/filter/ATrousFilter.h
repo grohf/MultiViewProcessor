@@ -20,8 +20,12 @@ class ATrousFilter : public Filter {
 	unsigned int atrous_radi;
 	unsigned int atrous_length;
 
+	unsigned int n_view;
+
 public:
-	ATrousFilter(unsigned int radi_=2) {
+	ATrousFilter(unsigned int n_view_ ,unsigned int radi_=2)
+	{
+		n_view = n_view_;
 		radi = radi_;
 		//	DeviceDataParamFunction f = shrinkData;
 		//	addParamChanger(f);

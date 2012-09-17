@@ -12,6 +12,9 @@
 
 #include "ATrousFilter.h"
 
+//Test
+#include "../sink/pcd_io.h"
+
 namespace device
 {
 	namespace constant
@@ -89,11 +92,11 @@ namespace device
 			sx = blockIdx.x*blockDim.x/constant::level2step_size[level];
 			ox = sx-constant::atrous_radi*constant::level2step_size[level] + blockIdx.x*blockDim.x-sx;
 
-			if(blockIdx.x == 1 && blockIdx.y==1 && threadIdx.x == 3 && threadIdx.y == 3)
-			{
-				printf("ox: %d | oy: %d \n",ox,oy);
-				printf("lx: %d | ly: %d \n",constant::lx,constant::ly);
-			}
+//			if(blockIdx.x == 1 && blockIdx.y==1 && threadIdx.x == 3 && threadIdx.y == 3)
+//			{
+//				printf("ox: %d | oy: %d \n",ox,oy);
+//				printf("lx: %d | ly: %d \n",constant::lx,constant::ly);
+//			}
 
 //			off = threadIdx.y*blockDim.x+threadIdx.x;
 //			sy = off/constant::lx;
@@ -266,6 +269,22 @@ void ATrousFilter::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+//	atrousfilter.level = 1;
+//	atrousfilter.input = (float4 *)getTargetDataPointer(0);
+//	atrousfilter.output = (float4 *)getInputDataPointer(0);
+//
+//	device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
+//	checkCudaErrors(cudaGetLastError());
+//	checkCudaErrors(cudaDeviceSynchronize());
+//
+//	atrousfilter.level = 2;
+//	atrousfilter.input = (float4 *)getInputDataPointer(0);
+//	atrousfilter.output = (float4 *)getTargetDataPointer(0);
+//
+//	device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
+//	checkCudaErrors(cudaGetLastError());
+//	checkCudaErrors(cudaDeviceSynchronize());
+
 	device::updateCoords<<<grid,block>>>(coordsUpdater);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
@@ -291,6 +310,21 @@ void ATrousFilter::execute()
 //
 //	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
 //	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
+
+	/* Test
+		char path[50];
+
+		for(int i=0;i<n_view;i++)
+		{
+			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+			checkCudaErrors(cudaMemcpy(h_f4_depth,coordsUpdater.pos+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+			sprintf(path,"/home/avo/pcds/src_wc_points_atfiltered_%d.pcd",i);
+			host::io::PCDIOController pcdIOCtrl;
+			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+		}
+	 */
+
 }
 
 
@@ -298,7 +332,7 @@ void ATrousFilter::init()
 {
 
 	block = dim3(32,24);
-	grid = dim3(640/block.x,480/block.y,1);
+	grid = dim3(640/block.x,480/block.y,n_view);
 
 	atrousfilter.modi = 1 | 2 | 4;
 	atrousfilter.level = 0;

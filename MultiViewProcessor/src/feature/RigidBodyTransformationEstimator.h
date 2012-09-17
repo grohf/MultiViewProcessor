@@ -41,6 +41,8 @@ class RigidBodyTransformationEstimator : public Feature {
 	unsigned int k;
 	unsigned int rn;
 
+	unsigned int n_view;
+
 	dim3 deMeanGrid;
 	dim3 deMeanBlock;
 
@@ -48,11 +50,13 @@ class RigidBodyTransformationEstimator : public Feature {
 	float *d_rnd_data;
 
 public:
-	RigidBodyTransformationEstimator(unsigned int rn_, unsigned int s_,unsigned int k_)
+	RigidBodyTransformationEstimator(unsigned int n_view_, unsigned int rn_, unsigned int s_,unsigned int k_)
 	{
 		s = s_;
 		k = k_;
 		rn = rn_;
+		n_view = n_view_;
+
 
 		DeviceDataParams probListParams;
 		probListParams.elements = s*k;

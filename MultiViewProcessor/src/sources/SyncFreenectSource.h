@@ -16,14 +16,22 @@ class SyncFreenectSource : public Source
 {
 public:
 
+
 	enum TargetIdx
 	{
-		PointXYZI = 0,
-		PointRGBA = 1,
-		SensorInfoList = 2,
+//		PointXYZI = 0,
+//		PointRGBA = 1,
+//		SensorInfoList = 2,
+
+		PointXYZI,
+		PointRGBA,
+		SensorInfoList,
+
+		ImageDepth,
+		ImageRGB,
 	};
 
-	SyncFreenectSource();
+	SyncFreenectSource(unsigned int n_view_);
 	virtual ~SyncFreenectSource();
 
 	void init();
@@ -45,6 +53,8 @@ private:
 
 	double ref_pix_size;
 	double ref_dist;
+
+	unsigned int n_view;
 };
 
 

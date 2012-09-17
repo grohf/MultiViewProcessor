@@ -22,7 +22,7 @@ namespace device
 
 		enum
 		{
-			kxr = 3,
+			kxr = 9,
 			kyr = kxr,
 
 			kx = 32+kxr*2,
@@ -266,7 +266,7 @@ void
 NormalPCAEstimator::init()
 {
 	block = dim3(32,24);
-	grid = dim3(640/block.x,480/block.y,1);
+	grid = dim3(640/block.x,480/block.y,n_view);
 
 
 	normalEstimator.input = (float4 *)getInputDataPointer(WorldCoordinates);
@@ -282,6 +282,37 @@ NormalPCAEstimator::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+	/* Test */
+
+	char path[50];
+	for(int v=0;v<n_view;v++)
+	{
+		float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
+		checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output+v*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+		uchar4 *h_uc4 = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		for(int i=0;i<640*480;i++)
+		{
+			if(h_f4_normals[i].w >= 0)
+			{
+				h_uc4[i].x = (h_f4_normals[i].x+1.0f)*127.f;
+				h_uc4[i].y = (h_f4_normals[i].y+1.0f)*127.f;
+				h_uc4[i].z = (h_f4_normals[i].z+1.0f)*127.f;
+				h_uc4[i].w = 127.f;
+			}
+			else
+			{
+				h_uc4[i].x = 0;
+				h_uc4[i].y = 0;
+				h_uc4[i].z = 0;
+				h_uc4[i].w = 127.f;
+			}
+
+		}
+
+		sprintf(path,"/home/avo/pcds/normals_pca_%d.ppm",v);
+		sdkSavePPM4ub(path,(unsigned char *)h_uc4,640,480);
+	}
 
 //	char path[50];
 //	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
@@ -301,10 +332,12 @@ NormalPCAEstimator::execute()
 	printf("normals done \n");
 }
 
-NormalPCAEstimator::NormalPCAEstimator()
+NormalPCAEstimator::NormalPCAEstimator(unsigned int n_view_)
 {
+	n_view = n_view_;
+
 	DeviceDataParams params;
-	params.elements = 640*480;
+	params.elements = 640*480*n_view;
 	params.element_size = sizeof(float4);
 	params.dataType = Point4D;
 	params.elementType = FLOAT4;

@@ -68,7 +68,7 @@ namespace device
 			int y = blockIdx.y*blockDim.y + threadIdx.y;
 			int z = blockIdx.z;
 
-			int wz = depth[y*640+x];
+			int wz = depth[z*640*480+y*640+x];
 			float wx,wy;
 
 			convertCXCYWZtoWXWYWZ(x,y,wz,wx,wy);
@@ -94,8 +94,8 @@ device::SyncFreenectLoader loader;
 void
 SyncFreenectSource::init()
 {
-	checkCudaErrors(cudaMalloc((void**)&d_rgb,640*480*3*sizeof(uint8_t)));
-	checkCudaErrors(cudaMalloc((void**)&d_depth,640*480*sizeof(uint16_t)));
+//	checkCudaErrors(cudaMalloc((void**)&d_rgb,640*480*3*sizeof(uint8_t)));
+//	checkCudaErrors(cudaMalloc((void**)&d_depth,640*480*sizeof(uint16_t)));
 
 //	printf("pointer before: %d \n",d_test_xyzi);
 //
@@ -106,8 +106,12 @@ SyncFreenectSource::init()
 
 //	setRegInfo();
 
-	loader.rgb = d_rgb;
-	loader.depth = d_depth;
+//	loader.rgb = d_rgb;
+//	loader.depth = d_depth;
+
+
+	loader.depth = (uint16_t *)getTargetDataPointer(ImageDepth);
+	loader.rgb = (uint8_t *)getTargetDataPointer(ImageRGB);
 
 	loader.xyzi = (float4 *)getTargetDataPointer(PointXYZI);
 	loader.rgba = (uchar4 *)getTargetDataPointer(PointRGBA);
@@ -115,7 +119,7 @@ SyncFreenectSource::init()
 //	printf("pointer xyzi: %d \n",loader.xyzi);
 
 	block = dim3(32,24);
-	grid = dim3(640/block.x,480/block.y);
+	grid = dim3(640/block.x,480/block.y,n_view);
 
 	cudaMemcpyToSymbol(device::constant::ref_pix_size,&ref_pix_size,sizeof(double));
 	cudaMemcpyToSymbol(device::constant::ref_dist,&ref_dist,sizeof(double));
@@ -132,15 +136,19 @@ void
 SyncFreenectSource::loadFrame()
 {
 
-	uint16_t *h_depth = 0;
-	uint8_t *h_rgb = 0;
-	uint32_t ts;
+	for(int v=0;v<n_view;v++)
+	{
+		uint16_t *h_depth = 0;
+		uint8_t *h_rgb = 0;
+		uint32_t ts;
 
-	freenect_sync_get_depth((void**)&h_depth, &ts, 0, FREENECT_DEPTH_REGISTERED);
-	freenect_sync_get_video((void**)&h_rgb, &ts, 0, FREENECT_VIDEO_RGB);
+		freenect_sync_get_depth((void**)&h_depth, &ts, v, FREENECT_DEPTH_REGISTERED);
+		freenect_sync_get_video((void**)&h_rgb, &ts, v, FREENECT_VIDEO_RGB);
 
-	checkCudaErrors(cudaMemcpy(d_rgb,h_rgb,640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
-	checkCudaErrors(cudaMemcpy(d_depth,h_depth,640*480*sizeof(uint16_t),cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(loader.rgb + v*640*480*3,h_rgb,640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(loader.depth + v*640*480,h_depth,640*480*sizeof(uint16_t),cudaMemcpyHostToDevice));
+
+	}
 
 //	printf("pointer rgb: %d \n",loader.rgb);
 //	printf("pointer xyzi: %d \n",loader.xyzi);
@@ -154,23 +162,41 @@ SyncFreenectSource::loadFrame()
 /*
 	char path[50];
 
-	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-	checkCudaErrors(cudaMemcpy(h_f4_depth,loader.xyzi,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+	for(int i=0;i<n_view;i++)
+	{
+		float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+		checkCudaErrors(cudaMemcpy(h_f4_depth,loader.xyzi+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-	sprintf(path,"/home/avo/pcds/src_wc_points%d.pcd",0);
-	host::io::PCDIOController pcdIOCtrl;
-	pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+		sprintf(path,"/home/avo/pcds/src_wc_points_%d.pcd",i);
+		host::io::PCDIOController pcdIOCtrl;
+		pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+	}
+
 */
-
-
 	printf("loaded! \n");
 }
 
-SyncFreenectSource::SyncFreenectSource()
+SyncFreenectSource::SyncFreenectSource(unsigned int n_view_)
 {
+	n_view = n_view_;
+
+	DeviceDataParams imageDepthParams;
+	imageDepthParams.elements = 640*480*n_view;
+	imageDepthParams.element_size = sizeof(uint16_t);
+	imageDepthParams.dataType = Point1D;
+	imageDepthParams.elementType = UINT1;
+	addTargetData(addDeviceDataRequest(imageDepthParams),ImageDepth);
+
+	DeviceDataParams imageRGBParams;
+	imageRGBParams.elements = 640*480*n_view;
+	imageRGBParams.element_size = 3*sizeof(uint8_t);
+	imageRGBParams.dataType = Point3D;
+	imageRGBParams.elementType = UINT3;
+	addTargetData(addDeviceDataRequest(imageRGBParams),ImageRGB);
+
 
 	DeviceDataParams pointXYZIParams;
-	pointXYZIParams.elements = 640*480;
+	pointXYZIParams.elements = 640*480*n_view;
 	pointXYZIParams.element_size = sizeof(float4);
 	pointXYZIParams.dataType = Point4D;
 	pointXYZIParams.elementType = FLOAT4;
@@ -178,7 +204,7 @@ SyncFreenectSource::SyncFreenectSource()
 	addTargetData(addDeviceDataRequest(pointXYZIParams),PointXYZI);
 
 	DeviceDataParams pointRGBAParams;
-	pointRGBAParams.elements = 640*480;
+	pointRGBAParams.elements = 640*480*n_view;
 	pointRGBAParams.element_size = sizeof(uchar4);
 	pointRGBAParams.dataType = Point4D;
 	pointRGBAParams.elementType = UCHAR4;
@@ -186,7 +212,7 @@ SyncFreenectSource::SyncFreenectSource()
 	addTargetData(addDeviceDataRequest(pointRGBAParams),PointRGBA);
 
 	DeviceDataParams sensorInfoListParams;
-	sensorInfoListParams.elements = 1;
+	sensorInfoListParams.elements = n_view;
 	sensorInfoListParams.element_size = sizeof(SensorInfo);
 	sensorInfoListParams.dataType = ListItem;
 	sensorInfoListParams.elementType = SensorInfoItem;

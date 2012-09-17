@@ -25,6 +25,7 @@
 #include "../filter/TestFilter.h"
 #include "../filter/TestFilter2.h"
 #include "../filter/ATrousFilter.h"
+#include "../filter/TruncateThresholdFilter.h"
 #include "../feature/NormalPCAEstimator.h"
 #include "../feature/FPFH.h"
 #include "../feature/SVDEstimatorCPU.h"
@@ -33,7 +34,7 @@
 
 void runTestProcessor()
 {
-	SyncFreenectSource *src = new SyncFreenectSource();
+	SyncFreenectSource *src = new SyncFreenectSource(1);
 //	SourcePtr src(new SyncFreenectSource());
 
 	Processor p;
@@ -42,24 +43,24 @@ void runTestProcessor()
 //	SVDEstimator_CPU *svd_cpu = new SVDEstimator_CPU();
 //	p.addFeature(svd_cpu);
 
-	ATrousFilter *atrousfilter = new ATrousFilter();
+	ATrousFilter *atrousfilter = new ATrousFilter(1);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
 
 	p.addFilter(FilterPtr(atrousfilter));
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator();
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 //	nPCAestimator->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
 	p.addFeature(nPCAestimator);
 
-	FPFH *fpfhEstimator = new FPFH();
+	FPFH *fpfhEstimator = new FPFH(1);
 	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	fpfhEstimator->setNormals(nPCAestimator->getNormals());
 
 	p.addFeature(fpfhEstimator);
 
-	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(256,64,32);
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(1,256,64,32);
 	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
 	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
 	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
@@ -74,10 +75,53 @@ void runTestProcessor()
 
 }
 
+
+void runMultiViewTest()
+{
+	SyncFreenectSource *src = new SyncFreenectSource(2);
+//	SourcePtr src(new SyncFreenectSource());
+
+	Processor p;
+	p.setSource(SourcePtr(src));
+
+//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2500.f);
+//	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
+//	p.addFilter(FilterPtr(truncateThresholdFilter));
+
+	ATrousFilter *atrousfilter = new ATrousFilter(2);
+	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
+	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
+	p.addFilter(FilterPtr(atrousfilter));
+
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2);
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(nPCAestimator);
+
+
+	FPFH *fpfhEstimator = new FPFH(2);
+	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	fpfhEstimator->setNormals(nPCAestimator->getNormals());
+	p.addFeature(fpfhEstimator);
+
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,256,64,32);
+	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
+	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
+	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
+	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(rbEstimator);
+
+
+	p.start();
+
+	src->~SyncFreenectSource();
+}
+
 void coorespTest()
 {
-	SyncFreenectSource *src = new SyncFreenectSource();
+	SyncFreenectSource *src = new SyncFreenectSource(2);
 //	SourcePtr src(new SyncFreenectSource());
+
+
 
 	Processor p;
 	p.setSource(SourcePtr(src));
@@ -88,6 +132,8 @@ void coorespTest()
  */
 int main(int argc, char **argv) {
 
-	runTestProcessor();
+//	runTestProcessor();
+
+	runMultiViewTest();
 	return 0;
 }
