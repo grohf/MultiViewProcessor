@@ -130,6 +130,7 @@ SyncFreenectSource::init()
 
 	SensorInfo *d_sinfoList = (SensorInfo *)getTargetDataPointer(SensorInfoList);
 	checkCudaErrors(cudaMemcpy(d_sinfoList,&sinfo,1*sizeof(SensorInfo),cudaMemcpyHostToDevice));
+
 }
 
 void
@@ -159,7 +160,7 @@ SyncFreenectSource::loadFrame()
 
 	/* TEST */
 
-/*
+
 	char path[50];
 
 	for(int i=0;i<n_view;i++)
@@ -172,7 +173,7 @@ SyncFreenectSource::loadFrame()
 		pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
 	}
 
-*/
+
 	printf("loaded! \n");
 }
 
@@ -220,6 +221,21 @@ SyncFreenectSource::SyncFreenectSource(unsigned int n_view_)
 	addTargetData(addDeviceDataRequest(sensorInfoListParams),SensorInfoList);
 
 	setRegInfo();
+
+	printf("discarding first 3 image sets... \n");
+	for(int i=0;i<3;i++)
+	{
+		for(int v=0;v<n_view;v++)
+		{
+			uint16_t *h_depth = 0;
+			uint8_t *h_rgb = 0;
+			uint32_t ts;
+
+			freenect_sync_get_depth((void**)&h_depth, &ts, v, FREENECT_DEPTH_REGISTERED);
+			freenect_sync_get_video((void**)&h_rgb, &ts, v, FREENECT_VIDEO_RGB);
+		}
+	}
+	printf("done! \n");
 }
 
 void

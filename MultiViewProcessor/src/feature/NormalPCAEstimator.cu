@@ -69,7 +69,7 @@ namespace device
 
 
 
-			if(mid.z==0)
+			if(mid.z<=0)
 			{
 				  sx = threadIdx.x + blockIdx.x * blockDim.x;
 				  sy = threadIdx.y + blockIdx.y * blockDim.y;
@@ -79,7 +79,7 @@ namespace device
 				  return;
 			}
 
-			if(mid.z>4000)
+			if(mid.z>8000)
 			{
 				  sx = threadIdx.x + blockIdx.x * blockDim.x;
 				  sy = threadIdx.y + blockIdx.y * blockDim.y;

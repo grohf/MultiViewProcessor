@@ -20,13 +20,20 @@ class ATrousFilter : public Filter {
 	unsigned int atrous_radi;
 	unsigned int atrous_length;
 
+	unsigned int iterations;
+	float sigma_depth;
+	float sigma_intensity;
+
 	unsigned int n_view;
 
 public:
-	ATrousFilter(unsigned int n_view_ ,unsigned int radi_=2)
+	ATrousFilter(unsigned int n_view_, unsigned int iteration_, float sigma_depth_, float sigma_intensity_, unsigned int radi_=2) :
+		iterations(iteration_), sigma_depth(sigma_depth_), sigma_intensity(sigma_intensity_)
 	{
 		n_view = n_view_;
 		radi = radi_;
+
+
 		//	DeviceDataParamFunction f = shrinkData;
 		//	addParamChanger(f);
 	};

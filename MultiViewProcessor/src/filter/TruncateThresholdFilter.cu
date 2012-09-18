@@ -37,7 +37,7 @@ namespace device
 
 			float4 wc = pos[off];
 			if(wc.z < min || wc.z > max)
-				pos[off].z = 0;
+				pos[off].z = -1.f;
 		}
 
 	};

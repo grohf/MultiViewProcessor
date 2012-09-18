@@ -8,6 +8,9 @@
 #include <curand.h>
 #include <helper_cuda.h>
 
+#include <thrust/remove.h>
+#include <thrust/iterator/zip_iterator.h>
+
 #include "SVDEstimatorCPU.h"
 #include "RigidBodyTransformationEstimator.h"
 #include "utils.hpp"
@@ -17,9 +20,17 @@
 printf (" Error at % s :% d \ n " , __FILE__ , __LINE__ ) ;\
 return EXIT_FAILURE ;}} while (0)
 
+#ifndef MAX_VIEWS
+#define MAX_VIEWS 8
+#endif
 
 namespace device
 {
+	namespace constant
+	{
+//		__constant__ unsigned int idx2xyTriangle[(MAX_VIEWS*(MAX_VIEWS+1))/2][2];
+	}
+
 	struct OMEstimator
 	{
 
@@ -393,11 +404,11 @@ namespace device
 
 						if(gtid<groups_per_warp)
 						{
+							matricesH[(sd*3+td)*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
+
 //							if(gtid==0 && sd==0 && td==0)
 //								printf("r: %f | gtid: %d \n",warpLine[gtid*group_length],gtid);
-
-							output_correlationMatrixes[ (sd*3+td)*n_rsac+blockIdx.x*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
-							matricesH[(sd*3+td)*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
+//							output_correlationMatrixes[ (sd*3+td)*n_rsac+blockIdx.x*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
 //							if(blockIdx.x == 0 && threadIdx.x==0)
 //							{
 //								for(int i=0;i<groups_per_warp;i++)
@@ -447,7 +458,7 @@ namespace device
 
     			if(evals.x==0 || evals.y == 0 || evals.z == 0)
     			{
-    				printf("out: %d \n",threadIdx.x);
+//    				printf("out: %d \n",threadIdx.x);
 
 //    				output_transformationMatrices[blockIdx.x*n_rsac+threadIdx.x] = -1.f;
 
@@ -543,8 +554,9 @@ namespace device
 
 			int ret = (det < 0.9f || det > 1.1f)?(int)-1:(int)(blockIdx.x*n_matrices+threadIdx.x);
 
-			output_transformationMetaData[blockIdx.x*n_matrices+threadIdx.x] = ret;
-			output_transformationMetaData[n_rsac + blockIdx.x*n_matrices +threadIdx.x] = ret;
+			output_transformationMetaData[1+blockIdx.x*n_matrices+threadIdx.x] = ret;
+			output_transformationMetaData[1+n_rsac + blockIdx.x*n_matrices +threadIdx.x] = view_src;
+			output_transformationMetaData[1+2*n_rsac + blockIdx.x*n_matrices +threadIdx.x] = view_target;
 
 			if(ret==-1)
 				return;
@@ -567,7 +579,7 @@ namespace device
 			output_transformationMatrices[10*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[4*n_matrices+threadIdx.x] - (vec_tmp[1].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[1].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[1].z*centroids[2*n_matrices+threadIdx.x]);
 			output_transformationMatrices[11*n_rsac + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[5*n_matrices+threadIdx.x] - (vec_tmp[2].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[2].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[2].z*centroids[2*n_matrices+threadIdx.x]);
 
-			printf("(%d) det: %f \n",threadIdx.x,det);
+//			printf("(%d) det: %f \n",threadIdx.x,det);
 
 //			__syncthreads();
 //			if(threadIdx.x==0 && blockIdx.x==0)
@@ -638,11 +650,11 @@ namespace device
 		unsigned int view_src;
 		unsigned int view_target;
 
-		float *histoMap1;
-		float *histoMap2;
+		float *histoMap;
+//		float *histoMap2;
 
-		unsigned int *idxList1;
-		unsigned int *idxList2;
+		unsigned int *idxList;
+//		unsigned int *idxList2;
 
 		float *rndList;
 		unsigned int *infoList;
@@ -750,7 +762,7 @@ namespace device
 			if(threadIdx.x<sp)
 			{
 				float f = rndList[blockIdx.x*sp+threadIdx.x];
-				unsigned int idx = idxList1[(unsigned int)(f*infoList[view_src+1])];
+				unsigned int idx = idxList[view_src*640*480+(unsigned int)(f*infoList[view_src+1])];
 				shm_local_idx[threadIdx.x] = idx;
 				output_s_idx[blockIdx.x*sp+threadIdx.x] = idx;
 
@@ -772,7 +784,7 @@ namespace device
 //				unsigned int idx =  idxList1[blockIdx.x*sp+sl];
 
 
-				shm_local_histo[sl + b*sp] = histoMap1[shm_local_idx[sl]*bins+b];
+				shm_local_histo[sl + b*sp] = histoMap[view_src*640*480+shm_local_idx[sl]*bins+b];
 			}
 
 
@@ -785,7 +797,7 @@ namespace device
 				//Get the index of the k global points;
 				for(int i=threadIdx.x;i<k;i+=blockDim.x)
 				{
-					shm_global_idx[i] = idxList2[i+l*k];
+					shm_global_idx[i] = idxList[view_src*640*480+i+l*k];
 				}
 				__syncthreads();
 
@@ -795,7 +807,7 @@ namespace device
 					unsigned int idx = shm_global_idx[kl];
 					unsigned int b = i-kl*bins;
 
-					shm_global_buffer[kl + b*k] = histoMap2[idx*bins+b];
+					shm_global_buffer[kl + b*k] = histoMap[view_target*640*480+idx*bins+b];
 				}
 				__syncthreads();
 
@@ -1082,6 +1094,20 @@ namespace device
 	};
 	__global__ void estimateCorrespondance(const SKCorrespondanceEstimator<8> ce) {ce (); }
 
+	template<typename T, int Value>
+	struct invalid
+	{
+		template<typename Tuple>
+		__device__ bool operator()(const Tuple& tuple) const
+		{
+			const T idx = thrust::get<0>(tuple);
+
+			if(idx==Value)
+				return true;
+
+			return false;
+		}
+	};
 
 
 }
@@ -1096,11 +1122,11 @@ void RigidBodyTransformationEstimator::init()
 	checkCudaErrors(curandSetPseudoRandomGeneratorSeed(gen,1234ULL));
 
 
-	correspondanceEstimator.histoMap1 = (float *)getInputDataPointer(HistogramMap);
-	correspondanceEstimator.idxList1 = (unsigned int *)getInputDataPointer(IdxList);
+	correspondanceEstimator.histoMap = (float *)getInputDataPointer(HistogramMap);
+	correspondanceEstimator.idxList = (unsigned int *)getInputDataPointer(IdxList);
 
-	correspondanceEstimator.histoMap2 = (float *)getInputDataPointer(HistogramMap);
-	correspondanceEstimator.idxList2 = (unsigned int *)getInputDataPointer(IdxList);
+//	correspondanceEstimator.histoMap2 = (float *)getInputDataPointer(HistogramMap);
+//	correspondanceEstimator.idxList2 = (unsigned int *)getInputDataPointer(IdxList);
 
 	correspondanceEstimator.infoList = (unsigned int *)getInputDataPointer(InfoList);
 
@@ -1162,13 +1188,37 @@ void RigidBodyTransformationEstimator::execute()
 	checkCudaErrors(cudaDeviceSynchronize());
 
 	deMeanedCorrelatonMEstimator.view_src = 0;
-	deMeanedCorrelatonMEstimator.view_target = 0;
+	deMeanedCorrelatonMEstimator.view_target = 1;
 	device::estimateCorrelationMatrix<<<deMeanGrid,deMeanBlock>>>(deMeanedCorrelatonMEstimator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	float *h_corrmatrices = (float *)malloc(rn*9*sizeof(float));
-	checkCudaErrors( cudaMemcpy(h_corrmatrices,deMeanedCorrelatonMEstimator.output_correlationMatrixes,rn*9*sizeof(float),cudaMemcpyDeviceToHost));
+
+	thrust::device_ptr<int> metaData = thrust::device_pointer_cast(deMeanedCorrelatonMEstimator.output_transformationMetaData+1);
+
+//	size_t length = thrust::remove_if(
+//			thrust::make_zip_iterator(thrust::make_tuple(metaData,metaData+rn,metaData+2*rn)),
+//			thrust::make_zip_iterator(thrust::make_tuple(metaData+rn,metaData+2*rn,metaData+3*rn)),
+//					device::invalid<int,-1>())
+//			- thrust::make_zip_iterator(thrust::make_tuple(metaData,metaData+rn,metaData+2*rn));
+//
+
+	size_t length = thrust::remove(metaData,metaData+rn,-1)- metaData;
+
+	checkCudaErrors(cudaMemcpy(deMeanedCorrelatonMEstimator.output_transformationMetaData,&length,sizeof(int),cudaMemcpyHostToDevice));
+	printf("length: %u \n",length);
+//
+//	int *h_metadata = (int *)malloc(rn*3*sizeof(int));
+//	checkCudaErrors( cudaMemcpy(h_metadata,deMeanedCorrelatonMEstimator.output_transformationMetaData,rn*3*sizeof(int),cudaMemcpyDeviceToHost));
+
+//	for(int off=0;off<length;off++)
+//	{
+//		printf(" %u  \n",h_metadata[off]);
+//	}
+
+
+//	float *h_corrmatrices = (float *)malloc(rn*9*sizeof(float));
+//	checkCudaErrors( cudaMemcpy(h_corrmatrices,deMeanedCorrelatonMEstimator.output_correlationMatrixes,rn*9*sizeof(float),cudaMemcpyDeviceToHost));
 
 
 //	for(int off=0;off<64;off++)

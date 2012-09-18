@@ -183,7 +183,7 @@ namespace device
 							continue;
 						}
 
-						if(lengthf43(minusf43(mid_pos,cur_pos))>radius || mid_off==off)
+						if(lengthf43(minusf43(mid_pos,cur_pos))>radius || mid_off==off || cur_normal.w < 0)
 						{
 								continue;
 						}
@@ -240,7 +240,7 @@ namespace device
 				}
 
 				for(int i=0;i<8;i++)
-					output_bins[mid_global_off*8+i] = (point_count > 0 && invalid_points/point_count < 0.3)?((float)mid_bin[i])/((float)point_count):-1;
+					output_bins[mid_global_off*8+i] = (point_count > 0 && invalid_points/point_count < 0.6)?((float)mid_bin[i])/((float)point_count):-1;
 
 
 			}

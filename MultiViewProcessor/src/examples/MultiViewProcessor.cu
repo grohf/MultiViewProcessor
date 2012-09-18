@@ -30,6 +30,7 @@
 #include "../feature/FPFH.h"
 #include "../feature/SVDEstimatorCPU.h"
 #include "../feature/RigidBodyTransformationEstimator.h"
+#include "../feature/TranformationValidator.h"
 
 
 void runTestProcessor()
@@ -43,7 +44,7 @@ void runTestProcessor()
 //	SVDEstimator_CPU *svd_cpu = new SVDEstimator_CPU();
 //	p.addFeature(svd_cpu);
 
-	ATrousFilter *atrousfilter = new ATrousFilter(1);
+	ATrousFilter *atrousfilter = new ATrousFilter(1,1,5,5);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
 
@@ -84,11 +85,11 @@ void runMultiViewTest()
 	Processor p;
 	p.setSource(SourcePtr(src));
 
-//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2500.f);
+//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
 //	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
 //	p.addFilter(FilterPtr(truncateThresholdFilter));
 
-	ATrousFilter *atrousfilter = new ATrousFilter(2);
+	ATrousFilter *atrousfilter = new ATrousFilter(2,2,10,5,2);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
 	p.addFilter(FilterPtr(atrousfilter));
@@ -110,6 +111,11 @@ void runMultiViewTest()
 	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(rbEstimator);
 
+	TranformationValidator *validator = new TranformationValidator();
+	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+	validator->setTransformationmatrices(rbEstimator->getTransformationMatrices());
+	validator->setTranformationInfoList(rbEstimator->getTransformationInfoList());
+	p.addFeature(validator);
 
 	p.start();
 

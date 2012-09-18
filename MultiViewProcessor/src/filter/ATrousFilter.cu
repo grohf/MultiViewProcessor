@@ -42,6 +42,9 @@ namespace device
 		unsigned int modi;
 		unsigned int level;
 
+		float sigma_depth;
+		float sigma_intensity;
+
 		float4* input;
 		float4* output;
 
@@ -63,8 +66,8 @@ namespace device
 
 				off = blockIdx.z*640*480+sy*640+sx;
 
-				if(off >= 640*480)
-					printf("off to big!! x: %d | y: %d | z: %d \n",sx,sy,blockIdx.z);
+//				if(off >= 640*480)
+//					printf("off to big!! x: %d | y: %d | z: %d \n",sx,sy,blockIdx.z);
 
 				float4 inp = input[off];
 
@@ -86,16 +89,25 @@ namespace device
 
 			int ox,oy;
 
-			sy = blockIdx.y*blockDim.y/constant::level2step_size[level];
-			oy = sy-constant::atrous_radi*constant::level2step_size[level] + blockIdx.y*blockDim.y-sy;
+//			sy = blockIdx.y*blockDim.y/constant::level2step_size[level];
+//			oy = sy-constant::atrous_radi*constant::level2step_size[level] + blockIdx.y*blockDim.y-sy;
+//
+//			sx = blockIdx.x*blockDim.x/constant::level2step_size[level];
+//			ox = sx-constant::atrous_radi*constant::level2step_size[level] + blockIdx.x*blockDim.x-sx;
 
-			sx = blockIdx.x*blockDim.x/constant::level2step_size[level];
-			ox = sx-constant::atrous_radi*constant::level2step_size[level] + blockIdx.x*blockDim.x-sx;
+			sy = blockIdx.y/constant::level2step_size[level];
+			oy = sy*blockDim.y*constant::level2step_size[level] + blockIdx.y-sy*constant::level2step_size[level] - constant::atrous_radi*constant::level2step_size[level];
 
-//			if(blockIdx.x == 1 && blockIdx.y==1 && threadIdx.x == 3 && threadIdx.y == 3)
+			sx = blockIdx.x/constant::level2step_size[level];
+			ox = sx*blockDim.x*constant::level2step_size[level] + blockIdx.x-sx*constant::level2step_size[level] - constant::atrous_radi*constant::level2step_size[level];
+
+
+
+//			if(blockIdx.z==0 && blockIdx.x == 3 && blockIdx.y==0 && threadIdx.x == 0 && threadIdx.y == 0)
 //			{
+//				printf("step_size: %d ",constant::level2step_size[level]);
 //				printf("ox: %d | oy: %d \n",ox,oy);
-//				printf("lx: %d | ly: %d \n",constant::lx,constant::ly);
+////				printf("lx: %d | ly: %d \n",constant::lx,constant::ly);
 //			}
 
 //			off = threadIdx.y*blockDim.x+threadIdx.x;
@@ -178,14 +190,14 @@ namespace device
 					weight = constant::atrous_coef[sy*constant::atrous_length+sx];
 					if(cur_depth==0.0f) weight = 0.0f;
 
-					if(mid_depth != 0.0f && (modi & 2) )
+					if(mid_depth != 0.0f && (sigma_depth > 0) )
 					{
-						weight *= __expf(-0.5f*(abs(mid_depth-cur_depth)/(10.0f * 10.0f)));
+						weight *= __expf(-0.5f*(abs(mid_depth-cur_depth)/(sigma_depth * sigma_depth)));
 					}
 
-					if(modi & 4)
+					if(sigma_intensity > 0)
 					{
-						 weight *= __expf(-0.5f*(abs(mid_luma-shm[off].w)/(5.0f * 5.0f)));
+						 weight *= __expf(-0.5f*(abs(mid_luma-shm[off].w)/(sigma_intensity * sigma_intensity)));
 					}
 
 					sum += weight * cur_depth;
@@ -193,10 +205,13 @@ namespace device
 				}
 			}
 
+			if(mid_depth==0)
+				sum_weight = 0.f;
+
 			/* ---------- SAVE ----------- */
 
-			sx = blockIdx.x*blockDim.x + threadIdx.x;
-			sy = blockIdx.y*blockDim.y + threadIdx.y;
+			sx = threadIdx.x;
+			sy = threadIdx.y;
 	//
 			off = (sum_weight/constant::atrous_sum)*255.0f;
 			off = (off << 16 | off << 8 | off) & 0x00ffffff;
@@ -207,7 +222,9 @@ namespace device
 			off = (threadIdx.y+constant::atrous_radi)*constant::lx+threadIdx.x+constant::atrous_radi;
 			shm[off].z = (sum_weight>0)?(sum/sum_weight):0;
 //			surf3Dwrite<float4>(shm[off],surf::surfRefBuffer,sx*sizeof(float4),sy,blockIdx.z);
-			output[blockIdx.z*640*480+sy*640+sx] = shm[off];
+			output[blockIdx.z*640*480
+			       +(oy+constant::atrous_radi*constant::level2step_size[level]+sy*constant::level2step_size[level])*640
+			       +(ox+constant::atrous_radi*constant::level2step_size[level]+sx*constant::level2step_size[level])] = shm[off];
 
 //				float4 f4t = make_float4(0,0,500,0);
 //				surf3Dwrite<float4>(f4t,surf::surfRefBuffer,sx*sizeof(float4),sy,0);
@@ -265,13 +282,26 @@ device::CoordsUpdater coordsUpdater;
 void ATrousFilter::execute()
 {
 
-	device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
+	printf("iterations: %d  \n",iterations);
 
-//	atrousfilter.level = 1;
-//	atrousfilter.input = (float4 *)getTargetDataPointer(0);
-//	atrousfilter.output = (float4 *)getInputDataPointer(0);
+	if(iterations > 0)
+	{
+		device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+		for(int l=1;l<iterations;l++)
+		{
+			printf("iteraten: %d \n",l);
+			checkCudaErrors(cudaMemcpy(atrousfilter.input,atrousfilter.output,n_view*640*480*sizeof(float4),cudaMemcpyDeviceToDevice));
+
+			atrousfilter.level = l;
+			device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
+			checkCudaErrors(cudaGetLastError());
+			checkCudaErrors(cudaDeviceSynchronize());
+		}
+	}
+
 //
 //	device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
 //	checkCudaErrors(cudaGetLastError());
@@ -311,7 +341,7 @@ void ATrousFilter::execute()
 //	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
 //	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 
-	/* Test
+//	 Test
 		char path[50];
 
 		for(int i=0;i<n_view;i++)
@@ -323,7 +353,7 @@ void ATrousFilter::execute()
 			host::io::PCDIOController pcdIOCtrl;
 			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
 		}
-	 */
+
 
 }
 
@@ -336,8 +366,12 @@ void ATrousFilter::init()
 
 	atrousfilter.modi = 1 | 2 | 4;
 	atrousfilter.level = 0;
+	atrousfilter.sigma_depth = sigma_depth;
+	atrousfilter.sigma_intensity = sigma_intensity;
+
 	atrousfilter.input = (float4 *)getInputDataPointer(0);
 	atrousfilter.output = (float4 *)getTargetDataPointer(0);
+
 
 //	printf("atrous_radi: %d \n",atrous_radi);
 //	cudaMemcpyToSymbol(device::constant::atrous_radi,&atrous_radi,sizeof(unsigned int));

@@ -112,11 +112,13 @@ public:
 
 
 		DeviceDataParams transformationMetaDataList;
-		transformationMetaDataList.elements = rn;
-		transformationMetaDataList.element_size = 4 * sizeof(int);
+		transformationMetaDataList.elements = 1+rn*3;
+		transformationMetaDataList.element_size = sizeof(int);
 		transformationMetaDataList.elementType = TransformationInfoListItem;
 		transformationMetaDataList.dataType = Indice;
 		addTargetData(addDeviceDataRequest(transformationMetaDataList),TransformationMetaDataList);
+
+
 
 	}
 	virtual ~RigidBodyTransformationEstimator() { }
@@ -142,6 +144,16 @@ public:
 	void setCoordinatesMap(DeviceDataInfoPtr pCoords)
 	{
 		addInputData(pCoords,Coordiantes);
+	}
+
+	DeviceDataInfoPtr getTransformationMatrices()
+	{
+		return getTargetData(TransformationMatrices);
+	}
+
+	DeviceDataInfoPtr getTransformationInfoList()
+	{
+		return getTargetData(TransformationMetaDataList);
 	}
 
 
