@@ -104,15 +104,19 @@ void runMultiViewTest()
 	fpfhEstimator->setNormals(nPCAestimator->getNormals());
 	p.addFeature(fpfhEstimator);
 
-	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,256,64,32);
+	unsigned int r_ransac = 256;
+
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,64,32);
 	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
 	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
 	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
 	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(rbEstimator);
 
-	TranformationValidator *validator = new TranformationValidator();
+	TranformationValidator *validator = new TranformationValidator(2,r_ransac);
 	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+	validator->setNormals(nPCAestimator->getNormals());
+	validator->setSensorInfoList(src->getTargetData(SyncFreenectSource::SensorInfoList));
 	validator->setTransformationmatrices(rbEstimator->getTransformationMatrices());
 	validator->setTranformationInfoList(rbEstimator->getTransformationInfoList());
 	p.addFeature(validator);
