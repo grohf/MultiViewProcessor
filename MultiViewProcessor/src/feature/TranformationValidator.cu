@@ -24,8 +24,8 @@ namespace device
 {
 	namespace constant
 	{
-		__constant__ unsigned int idx2x[(MAXVIEWS*MAXVIEWS-1)/2];
-		__constant__ unsigned int idx2y[(MAXVIEWS*MAXVIEWS-1)/2];
+		__constant__ unsigned int idx2d[(MAXVIEWS*MAXVIEWS-1)/2];
+		__constant__ unsigned int idx2m[(MAXVIEWS*MAXVIEWS-1)/2];
 	}
 
 
@@ -34,7 +34,7 @@ namespace device
 		enum
 		{
 			dx = 32,
-			dy = 24,
+			dy = 16,
 			WARP_SIZE = 32,
 		};
 
@@ -42,7 +42,7 @@ namespace device
 		float4 *normals;
 		SensorInfo *sinfo;
 
-		unsigned int matrix_dim_x;
+		unsigned int n_rsac;
 		float *transformation_matrices;
 		int *transformationMetaData;
 
@@ -94,19 +94,24 @@ namespace device
 			for(int soff=0;soff<shm_length;soff+=32)
 //			for(int soff=0;soff<32;soff+=32)
 			{
-				if(blockIdx.x==1 && blockIdx.y==2 && threadIdx.x==10 && threadIdx.y == 5)
-				{
-					printf("round: %d \n",soff/32);
-//					printf("%d \n",transformationMetaData[0]);
-//					printf("matrix_dim_x: %d",matrix_dim_x);
-				}
+//				if(blockIdx.x==1 && blockIdx.y==2 && threadIdx.x==10 && threadIdx.y == 5)
+//				{
+//					printf("round: %d \n",soff/32);
+////					printf("%d \n",transformationMetaData[0]);
+////					printf("matrix_dim_x: %d",matrix_dim_x);
+//				}
 
 
 				if(tid<32 && (tid+soff<shm_length) )
 				{
-					shm_idx[tid] = transformationMetaData[1+blockIdx.z*matrix_dim_x+tid+soff];
+					shm_idx[tid] = transformationMetaData[1+blockIdx.z*n_rsac+tid+soff];
 				}
 				__syncthreads();
+
+				if(blockIdx.x==0 && blockIdx.y==0 && tid < 32)
+				{
+					output_errorListIdx[blockIdx.z*n_rsac+soff+tid] = shm_idx[tid];
+				}
 
 				for(int t = tid;t<32*12;t+=blockDim.x*blockDim.y)
 				{
@@ -116,7 +121,7 @@ namespace device
 					if(wid+soff<shm_length)
 					{
 						unsigned int idx = shm_idx[wtid];
-						shm_tm[wid*32+wtid] = transformation_matrices[(blockIdx.z*12+wid)*matrix_dim_x+idx];
+						shm_tm[wid*32+wtid] = transformation_matrices[(blockIdx.z*12+wid)*n_rsac+idx];
 					}
 				}
 				__syncthreads();
@@ -134,8 +139,8 @@ namespace device
 				for(int i=0; (i<32) || (soff+i < shm_length) ;i++)
 				{
 					shm_error_buffer[tid] = 0.f;
-
-					if(pos.z == 0)
+/*
+					if(pos.z != 0)
 					{
 
 						float3 pos_m,n_m;
@@ -163,13 +168,14 @@ namespace device
 							float3 dv = make_float3(pos_m.x-pos_d.x,pos_m.y-pos_d.y,pos_m.z-pos_d.z);
 							float angle = n_m.x * n_d.x + n_m.y * n_d.y + n_m.z * n_d.z;
 
-							if( norm(dv) < dist_threshold && (((angle>=0)?angle:-angle) < angle_threshold) )
-							{
-								double error = dv.x*n_d.x * dv.y*n_d.y * dv.z*n_d.z;
-								shm_error_buffer[tid] = error * error;
-							}
+//							if( norm(dv) < dist_threshold && (((angle>=0)?angle:-angle) < angle_threshold) )
+//							{
+//								double error = dv.x*n_d.x * dv.y*n_d.y * dv.z*n_d.z;
+//								shm_error_buffer[tid] = error * error;
+//							}
 						}
 					}
+					*/
 					__syncthreads();
 
 					float sum = 0.f;
@@ -190,8 +196,8 @@ namespace device
 						if(tid==0)
 						{
 //							output_errorList[(blockIdx.z*matrix_dim_x+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = smem[0];
-//							output_errorList[(blockIdx.z*matrix_dim_x+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = blockIdx.y*gridDim.x+blockIdx.x;
-							output_errorList[(blockIdx.z*matrix_dim_x+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = 1;
+//							output_errorList[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = blockIdx.y*gridDim.x+blockIdx.x;
+							output_errorList[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = i/600.f;
 //							output_errorList[(i)*gridDim.y*gridDim.x+blockIdx.y*gridDim.x+blockIdx.x] = smem[0];
 						}
 					}
@@ -230,9 +236,11 @@ namespace device
 		};
 
 		float *errorList;
+		unsigned int *errorListIdx;
+
 		int *listMetaData;
 
-		unsigned int n;
+		unsigned int gxy;
 		unsigned int n_rsac;
 
 	    __device__ __forceinline__ void
@@ -251,16 +259,16 @@ namespace device
 	    	__syncthreads();
 	    	if(blockIdx.x>shm_length)
 	    	{
-	    		errorList[(blockIdx.y*n_rsac+blockIdx.x)*n] = numeric_limits<float>::max();
+	    		errorList[(blockIdx.y*n_rsac+blockIdx.x)*gxy] = numeric_limits<float>::max();
 				return;
 	    	}
 
 	    	float sum = 0.f;
-	    	while(i<n)
+	    	while(i<gxy)
 	    	{
-	    		sum += errorList[(blockIdx.y*n_rsac+blockIdx.x)*n+i];
-	    		if( (i+dx) < n )
-	    			sum += errorList[(blockIdx.y*n_rsac+blockIdx.x)*n+i+dx];
+	    		sum += errorList[(blockIdx.y*n_rsac+blockIdx.x)*gxy+i];
+	    		if( (i+dx) < gxy )
+	    			sum += errorList[(blockIdx.y*n_rsac+blockIdx.x)*gxy+i+dx];
 
 	    		i += dx*2;
 	    	}
@@ -285,7 +293,7 @@ namespace device
 	    		if(dx>=2) 	{ smem[tid] = sum = sum + smem[tid + 1]; 	}
 
 	    		if(tid==0)
-	    			errorList[(blockIdx.y*n_rsac)*n+blockIdx.x] = sum;
+	    			errorList[(blockIdx.y*n_rsac)*gxy+blockIdx.x] = sum;
 	    	}
 
 
@@ -303,13 +311,14 @@ namespace device
 		};
 
 		float *errorList;
+		unsigned int *errorListIdx;
+		float *transformationMatrices;
 
-		float *output_minimumError;
-		unsigned int *output_minimumErrorIdx;
+		float *output_minimumErrorTransformationMatrices;
 
-		unsigned int n;
+		unsigned int gxy;
 		unsigned int n_rsac;
-
+		unsigned int n_views;
 
 		__device__ __forceinline__ void
 		operator () () const
@@ -320,39 +329,87 @@ namespace device
 	    	unsigned int tid = threadIdx.x;
 	    	unsigned int i = tid;
 
-	    	float min = 0.f;
-	    	while(i<n)
-	    	{
-	    		float tmp = errorList[blockIdx.x*n_rsac*n+i];
-	    		if(tmp<min)
-	    			min = tmp;
+	    	float min = numeric_limits<float>::max();
+	    	unsigned int minIdx = 0;
 
-	    		if((i+dx) < n )
+	    	if(tid==0)
+	    	{
+	    		printf("max float: %f \n",min);
+	    		float tmp = errorList[blockIdx.x*gxy*n_rsac+3];
+	    		printf("tmp: %f \n",tmp);
+	    	}
+
+
+
+	    	while(i<n_rsac)
+	    	{
+	    		float tmp = errorList[blockIdx.x*gxy*n_rsac+i];
+	    		if(tmp<min)
 	    		{
-	    			tmp = errorList[blockIdx.x*n_rsac*n+i+dx];
+	    			min = tmp;
+	    			minIdx = errorListIdx[blockIdx.x*n_rsac+i];
+	    		}
+	    		if((i+dx) < gxy )
+	    		{
+	    			tmp = errorList[blockIdx.x*gxy*n_rsac+i+dx];
 	    			if(tmp<min)
+	    			{
 	    				min = tmp;
+	    				minIdx = errorListIdx[blockIdx.x*n_rsac+i+dx];
+	    			}
 	    		}
 
 	    		i += dx*2;
 	    	}
 
 	    	shm_error[tid] = min;
+	    	shm_idx[tid] = minIdx;
 	    	__syncthreads();
 
-	    	if(dx>=1024){ if(tid<512) 	{ float tmp = shm_error[tid + 512]; if(tmp<min) shm_error[tid] = min = tmp; } __syncthreads(); }
-	    	if(dx>=512)	{ if(tid<256) 	{ float tmp = shm_error[tid + 512]; if(tmp<min) shm_error[tid] = min = tmp; } __syncthreads(); }
-	    	if(dx>=1024){ if(tid<512) 	{ float tmp = shm_error[tid + 512]; if(tmp<min) shm_error[tid] = min = tmp; } __syncthreads(); }
+	    	if(tid==0)
+	    	{
+	    		for(int i=0;i<dx;i++)
+	    			printf("%f ",shm_error[i]);
+	    		printf("\n");
+	    	}
 
+	    	if(dx>=1024){ if(tid<512) 	{ float tmp = shm_error[tid + 512]; if(tmp<min) { shm_error[tid] = min = tmp; shm_idx[tid] = minIdx = shm_idx[tid + 512]; } } __syncthreads(); }
+	    	if(dx>=512)	{ if(tid<256) 	{ float tmp = shm_error[tid + 256]; if(tmp<min) { shm_error[tid] = min = tmp; shm_idx[tid] = minIdx = shm_idx[tid + 256]; } } __syncthreads(); }
+	    	if(dx>=256)	{ if(tid<128) 	{ float tmp = shm_error[tid + 128]; if(tmp<min) { shm_error[tid] = min = tmp; shm_idx[tid] = minIdx = shm_idx[tid + 128]; } } __syncthreads(); }
+	    	if(dx>=128)	{ if(tid<64) 	{ float tmp = shm_error[tid + 64]; 	if(tmp<min) { shm_error[tid] = min = tmp; shm_idx[tid] = minIdx = shm_idx[tid + 64];  } } __syncthreads(); }
+
+	    	if(tid<32)
+	    	{
+	    		volatile float *smem = shm_error;
+	    		volatile unsigned int *smemIdx = shm_idx;
+
+	    		if(dx>=64)	{ float tmp = smem[tid + 32]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 32]; } }
+	    		if(dx>=32)	{ float tmp = smem[tid + 16]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 16]; } }
+	    		if(dx>=16)	{ float tmp = smem[tid + 8]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 8]; 	} }
+	    		if(dx>=8)	{ float tmp = smem[tid + 4]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 4]; 	} }
+	    		if(dx>=4)	{ float tmp = smem[tid + 2]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 2]; 	} }
+	    		if(dx>=2)	{ float tmp = smem[tid + 1]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 1]; 	} }
+	    	}
+
+//	    	if(tid<12)
+//	    	{
+//	    		output_minimumErrorTransformationMatrices[(n_views*(n_views-1)/2)*tid + blockIdx.x] = transformationMatrices[(blockIdx.x*12+tid)*n_rsac+minIdx];
+//	    	}
+//
+    		if(tid==0)
+    		{
+//    			printf("min_kernel: %f \n",min);
+    			output_minimumErrorTransformationMatrices[(n_views*(n_views-1)/2)*12 + blockIdx.x] = min;
+    		}
 
 		}
-
-
 	};
+	__global__ void estimateMinimumErrorTransformation(ErrorListMinimumPicker<256> elmp){ elmp(); }
 }
 
 device::TransforamtionErrorEstimator transformationErrorestimator;
 device::ErrorListSumCalculator<256> errorListSumcalculator256;
+device::ErrorListMinimumPicker<256> errorListMinimumPicker256;
 
 void
 TranformationValidator::init()
@@ -368,28 +425,44 @@ TranformationValidator::init()
 
 	transformationErrorestimator.output_errorList = (float *)getTargetDataPointer(ErrorList);
 	transformationErrorestimator.output_errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
-//	transformationErrorestimator.matrix_dim_x = ((n_views-1)*n_views)/2 * n_rsac;
-	transformationErrorestimator.matrix_dim_x = n_rsac;
+//	transformationErrorestimator.n_rsac = ((n_views-1)*n_views)/2 * n_rsac;
+	transformationErrorestimator.n_rsac = n_rsac;
 
 	transformationErrorestimator.dist_threshold = 300;
 	transformationErrorestimator.dist_threshold = 0.5f;
 
 
 	errorListSumcalculator256.errorList = (float *)getTargetDataPointer(ErrorList);
+	errorListSumcalculator256.errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
 	errorListSumcalculator256.listMetaData = (int *)getInputDataPointer(TransformationInfoList);
-	errorListSumcalculator256.n = grid.x * grid.y;
+	errorListSumcalculator256.gxy = grid.x * grid.y;
 	errorListSumcalculator256.n_rsac = n_rsac;
+
+
+	errorListMinimumPicker256.errorList = (float *)getTargetDataPointer(ErrorList);
+	errorListMinimumPicker256.errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
+	errorListMinimumPicker256.transformationMatrices = (float *)getInputDataPointer(TransforamtionMatrices);
+	errorListMinimumPicker256.output_minimumErrorTransformationMatrices = (float *)getTargetDataPointer(MinimumErrorTransformationMatrices);
+	errorListMinimumPicker256.gxy = grid.x * grid.y;
+	errorListMinimumPicker256.n_rsac = n_rsac;
+	errorListMinimumPicker256.n_views = n_views;
+
 
 }
 
 void TranformationValidator::execute()
 {
 
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
 	device::computeTransformationError<<<grid,block>>>(transformationErrorestimator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-//	int load = n_rsac;
+
+
+//	int load = 10;
 //	float *h_tmp = (float *)malloc(load*grid.x*grid.y*sizeof(float));
 //	checkCudaErrors( cudaMemcpy(h_tmp,transformationErrorestimator.output_errorList,load*grid.x*grid.y*sizeof(float),cudaMemcpyDeviceToHost));
 //
@@ -407,15 +480,38 @@ void TranformationValidator::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	int load = 5;
-	float *h_tmp2 = (float *)malloc(load*sizeof(float));
-	checkCudaErrors( cudaMemcpy(h_tmp2,transformationErrorestimator.output_errorList,load*sizeof(float),cudaMemcpyDeviceToHost));
+//	int load = 10;
+//	float *h_tmp2 = (float *)malloc(load*sizeof(float));
+//	checkCudaErrors( cudaMemcpy(h_tmp2,transformationErrorestimator.output_errorList,load*sizeof(float),cudaMemcpyDeviceToHost));
+//
+//	for(int j=0;j<load;j++)
+//	{
+//		printf("(%d/%f) | ",j,h_tmp2[j]);
+//	}
+//	printf("\n");
 
-	for(int j=0;j<load;j++)
-	{
-		printf("(%d/%f) | ",j,h_tmp2[j]);
-	}
-	printf("\n");
+
+//	int load3 = 5;
+//	float *h_tmp3 = (float *)malloc(load3*sizeof(float));
+//
+//	h_tmp3[0] = 5.f;
+//	h_tmp3[1] = 4.f;
+//	h_tmp3[2] = 3.f;
+//	h_tmp3[3] = 2.6f;
+//	h_tmp3[4] = 2.3f;
+//	checkCudaErrors(cudaMemcpy(errorListMinimumPicker256.errorList,h_tmp3,load3*sizeof(float),cudaMemcpyHostToDevice));
+
+
+
+	device::estimateMinimumErrorTransformation<<<1,errorListMinimumPicker256.dx>>>(errorListMinimumPicker256);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	int load4 = 13;
+	float *h_tmp4 = (float *)malloc(load4*sizeof(float));
+	checkCudaErrors( cudaMemcpy(h_tmp4,errorListMinimumPicker256.output_minimumErrorTransformationMatrices,load4*sizeof(float),cudaMemcpyDeviceToHost));
+
+	printf("min_error: %f \n",h_tmp4[12]);
 
 
 }
@@ -434,7 +530,7 @@ TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int
 	errorListParams.dataType = Point;
 	addTargetData(addDeviceDataRequest(errorListParams),ErrorList);
 
-	printf("elements: %d \n",errorListParams.elements);
+//	printf("elements: %d \gxy",errorListParams.elements);
 
 	DeviceDataParams errorListIdxParams;
 	errorListIdxParams.elements = ((n_views-1)*n_views)/2 * n_rsac;
@@ -443,5 +539,38 @@ TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int
 	errorListIdxParams.dataType = Indice;
 	addTargetData(addDeviceDataRequest(errorListIdxParams),ErrorListIndices);
 
+	unsigned int length = (MAXVIEWS*(MAXVIEWS-1))/2;
+	unsigned int h_idx2d[length];
+	unsigned int h_idx2m[length];
+
+	{
+		unsigned i = 0;
+		for(int iy=0;iy<n_views;iy++)
+		{
+			for(int ix = iy+1; ix<n_views;ix++)
+			{
+				h_idx2d[i]=ix;
+				h_idx2m[i]=iy;
+				i++;
+			}
+		}
+	}
+
+	cudaMemcpyToSymbol(device::constant::idx2d,&h_idx2d,length*sizeof(unsigned int));
+	cudaMemcpyToSymbol(device::constant::idx2m,&h_idx2m,length*sizeof(unsigned int));
+
+	DeviceDataParams minErrorTransformationMatricesParams;
+	minErrorTransformationMatricesParams.elements = ((n_views-1)*n_views)/2;
+	minErrorTransformationMatricesParams.element_size = 13 * sizeof(float);
+	minErrorTransformationMatricesParams.elementType = FLOAT1;
+	minErrorTransformationMatricesParams.dataType = Matrix;
+	addTargetData(addDeviceDataRequest(minErrorTransformationMatricesParams),MinimumErrorTransformationMatrices);
+
+
+
+//	for(int i=0;i<(n_views*(n_views-1))/2;i++)
+//		printf("(%d/%d) | ",h_idx2y[i],h_idx2x[i]);
+//
+//	printf("\n");
 }
 

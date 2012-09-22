@@ -24,7 +24,7 @@ class TranformationValidator : public Feature {
 
 	enum Target
 	{
-		TransformationMatricesToWorldCorrdinates,
+		MinimumErrorTransformationMatrices,
 		ErrorList,
 		ErrorListIndices,
 	};
@@ -84,6 +84,11 @@ public:
 	void setTranformationInfoList(DeviceDataInfoPtr ddi)
 	{
 		addInputData(ddi,TransformationInfoList);
+	}
+
+	DeviceDataInfoPtr getMinimumErrorTransformation()
+	{
+		return getTargetData(MinimumErrorTransformationMatrices);
 	}
 
 };
