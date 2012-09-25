@@ -26,6 +26,18 @@ class ATrousFilter : public Filter {
 
 	unsigned int n_view;
 
+	enum Input
+	{
+		WorldCoordinates,
+		SensorInfoList,
+		PointIntensity,
+	};
+
+	enum Target
+	{
+		FilteredWorldCoordinates,
+	};
+
 public:
 	ATrousFilter(unsigned int n_view_, unsigned int iteration_, float sigma_depth_, float sigma_intensity_, unsigned int radi_=2) :
 		iterations(iteration_), sigma_depth(sigma_depth_), sigma_intensity(sigma_intensity_)
@@ -44,17 +56,22 @@ public:
 
 	void setInput2DPointCloud(DeviceDataInfoPtr ddiPtr)
 	{
-		addFilterInput(ddiPtr,0);
+		addFilterInput(ddiPtr,WorldCoordinates);
 	}
 
 	void setInputSensorInfo(DeviceDataInfoPtr ddiPtr)
 	{
-		addInputData(ddiPtr,1);
+		addInputData(ddiPtr,SensorInfoList);
+	}
+
+	void setPointIntensity(DeviceDataInfoPtr ddip)
+	{
+		addInputData(ddip,PointIntensity);
 	}
 
 	DeviceDataInfoPtr getFilteredWorldCoordinates()
 	{
-		return getTargetData(0);
+		return getTargetData(FilteredWorldCoordinates);
 	}
 
 private:

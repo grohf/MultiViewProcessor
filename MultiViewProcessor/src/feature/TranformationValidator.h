@@ -25,6 +25,7 @@ class TranformationValidator : public Feature {
 	enum Target
 	{
 		MinimumErrorTransformationMatrices,
+		ErrorTable,
 		ErrorList,
 		ErrorListIndices,
 	};
@@ -90,6 +91,12 @@ public:
 	{
 		return getTargetData(MinimumErrorTransformationMatrices);
 	}
+
+
+	/* Tester Fctions */
+	void TestMinimumPicker();
+	void TestSumCalculator();
+	void TestTransform();
 
 };
 

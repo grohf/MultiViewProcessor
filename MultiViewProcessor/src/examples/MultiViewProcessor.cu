@@ -32,6 +32,10 @@
 #include "../feature/RigidBodyTransformationEstimator.h"
 #include "../feature/TranformationValidator.h"
 
+#include "../include/point_info.hpp"
+
+#include "../debug/EigenCheckClass.h"
+
 
 void runTestProcessor()
 {
@@ -92,6 +96,7 @@ void runMultiViewTest()
 	ATrousFilter *atrousfilter = new ATrousFilter(2,2,10,5,2);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
+	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
 	p.addFilter(FilterPtr(atrousfilter));
 
 	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2);
@@ -137,6 +142,64 @@ void coorespTest()
 	p.setSource(SourcePtr(src));
 }
 
+void TesterFct()
+{
+//	TranformationValidator *validator = new TranformationValidator(2,512);
+//	validator->TestMinimumPicker();
+//	validator->TestSumCalculator();
+//	validator->TestTransform();
+
+//	EigenCheckClass *cpuCheck = new EigenCheckClass();
+//	cpuCheck->createTestOMRotation();
+//
+//	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,256,64,32);
+//	rbEstimator->TestCorrelationMatrix(cpuCheck->pos_m,cpuCheck->pos_d,cpuCheck->H);
+
+//	unsigned int k = 0;
+	float f = 0;
+	device::setValid(f);
+//	device::setReconstructed(f,31);
+
+	printf("%d %d \n",device::isReconstructed(f),device::getReconstructionLevel(f));
+
+	device::unsetReconstructed(f);
+
+	printf("%d \n",device::isReconstructed(f));
+
+	device::setForeground(f);
+
+	printf("%d %d %d",device::isForeground(f),device::isBackground(f),device::isSegmented(f));
+}
+
+void PointInfoTest()
+{
+	SyncFreenectSource *src = new SyncFreenectSource(2);
+//	SourcePtr src(new SyncFreenectSource());
+
+	Processor p;
+	p.setSource(SourcePtr(src));
+
+//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
+//	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
+//	p.addFilter(FilterPtr(truncateThresholdFilter));
+
+	ATrousFilter *atrousfilter = new ATrousFilter(2,2,10,5,2);
+	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
+	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
+	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
+	p.addFilter(FilterPtr(atrousfilter));
+
+	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
+	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFilter(FilterPtr(truncateThresholdFilter));
+
+
+
+	p.start();
+
+	src->~SyncFreenectSource();
+}
+
 /**
  * Host function that prepares data array and passes it to the CUDA kernel.
  */
@@ -144,6 +207,9 @@ int main(int argc, char **argv) {
 
 //	runTestProcessor();
 
-	runMultiViewTest();
+//	TesterFct();
+	PointInfoTest();
+
+//	runMultiViewTest();
 	return 0;
 }

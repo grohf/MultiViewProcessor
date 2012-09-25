@@ -8,6 +8,8 @@
 #ifndef RIGIDBODYTRANSFORMATIONESTIMATOR_H_
 #define RIGIDBODYTRANSFORMATIONESTIMATOR_H_
 
+#include <thrust/host_vector.h>
+
 #include <curand.h>
 #include "feature.hpp"
 
@@ -79,6 +81,8 @@ public:
 		rndParams.dataType = Indice;
 		addTargetData(addDeviceDataRequest(rndParams),RndIndices);
 
+
+		//TODO: check needed elements, mb just n_corresp*rn?
 		DeviceDataParams rndParams2;
 		rndParams2.elements = rn*s*k;
 		rndParams2.element_size = sizeof(float);
@@ -156,6 +160,7 @@ public:
 		return getTargetData(TransformationMetaDataList);
 	}
 
+	void TestCorrelationMatrix(thrust::host_vector<float4> pos1,thrust::host_vector<float4> pos2,thrust::host_vector<float> correlationMatrix);
 
 };
 

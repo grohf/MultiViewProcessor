@@ -11,6 +11,7 @@
 #include <libfreenect.h>
 #include <libfreenect-registration.h>
 
+#include "point_info.hpp"
 #include "SyncFreenectSource.h"
 #include <vector_types.h>
 
@@ -43,6 +44,7 @@ namespace device
 
 		float4 *xyzi;
 		uchar4 *rgba;
+		float *intensity;
 
 		__device__ __forceinline__ void
 		convertCXCYWZtoWXWYWZ(int cx,int cy, int wz, float &wx, float &wy) const
@@ -73,12 +75,15 @@ namespace device
 
 			convertCXCYWZtoWXWYWZ(x,y,wz,wx,wy);
 
-			unsigned char r = rgb[3*(y*640+x)+0];
-			unsigned char g = rgb[3*(y*640+x)+1];
-			unsigned char b = rgb[3*(y*640+x)+2];
+			unsigned char r = rgb[3*(z*640*480+y*640+x)+0];
+			unsigned char g = rgb[3*(z*640*480+y*640+x)+1];
+			unsigned char b = rgb[3*(z*640*480+y*640+x)+2];
 
-			float4 f4 = make_float4(wx,wy,wz,((r+r+r+b+g+g+g+g)>>3));
+			float4 f4 = make_float4(wx,wy,wz,0);
+			if(wz>0) setValid(f4.w);
 			xyzi[z*640*480+y*640+x] = f4;
+
+			intensity[z*640*480+y*640+x] = ((r+r+r+b+g+g+g+g)>>3);
 
 			uchar4 uc4 = make_uchar4(r,g,b,128);
 			rgba[z*640*480+y*640+x] = uc4;
@@ -115,6 +120,7 @@ SyncFreenectSource::init()
 
 	loader.xyzi = (float4 *)getTargetDataPointer(PointXYZI);
 	loader.rgba = (uchar4 *)getTargetDataPointer(PointRGBA);
+	loader.intensity = (float *)getTargetDataPointer(PointIntensity);
 
 //	printf("pointer xyzi: %d \n",loader.xyzi);
 
@@ -211,6 +217,13 @@ SyncFreenectSource::SyncFreenectSource(unsigned int n_view_)
 	pointRGBAParams.elementType = UCHAR4;
 
 	addTargetData(addDeviceDataRequest(pointRGBAParams),PointRGBA);
+
+	DeviceDataParams intensityParams;
+	intensityParams.elements = 640*480*n_view;
+	intensityParams.element_size = sizeof(float);
+	intensityParams.dataType = Point1D;
+	intensityParams.elementType = FLOAT1;
+	addTargetData(addDeviceDataRequest(intensityParams),PointIntensity);
 
 	DeviceDataParams sensorInfoListParams;
 	sensorInfoListParams.elements = n_view;

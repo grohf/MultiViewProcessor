@@ -10,6 +10,8 @@
 
 #include <thrust/remove.h>
 #include <thrust/iterator/zip_iterator.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 
 #include "SVDEstimatorCPU.h"
 #include "RigidBodyTransformationEstimator.h"
@@ -152,7 +154,7 @@ namespace device
 		enum
 		{
 			threads = 512,
-			n_corresp = 8,
+			n_corresp = 16,
 			n_matrices = threads/n_corresp,
 
 			WARP_SIZE = 32,
@@ -208,6 +210,22 @@ namespace device
 
 //			unsigned int tid = threadIdx.x;
 
+//			if(blockIdx.x == 0 && threadIdx.x==0)
+//			{
+//				printf("rnds: \n");
+//				for(int tid=0;tid<threads;tid++)
+//				{
+//					float rnd = rnd_src[blockIdx.x*threads+tid];
+//					unsigned int idx = (unsigned int)(rnd*n_src);
+//					unsigned int pidx = correspondanceIdxList[idx];
+//					printf("(%d/%d->",idx,pidx);
+//					pidx = correspondanceErrorIdxList[idx*n_target + (unsigned int)(rnd_target[blockIdx.x*threads+tid]*n_target)];
+//					printf("%d) | ",pidx);
+//				}
+//				printf("\n");
+//			}
+
+
 //			for(int i=threadIdx.x; i<n_matrices*n_corresp;i+=blockDim.x)
 			{
 				unsigned int tid = threadIdx.x;
@@ -243,11 +261,14 @@ namespace device
 //			__syncthreads();
 //			if(blockIdx.x == 0 && threadIdx.x==0)
 //			{
-//				for(int i=0;i<threads;i++)
+//				for(int d=0;d<6;d++)
 //				{
-//					printf("(%d) %f | ",i,points[i]);
+//					for(int i=0;i<threads;i++)
+//					{
+//						printf("%2.2f | ",points[d*threads+i]);
+//					}
+//					printf(" \n");
 //				}
-//				printf(" \n");
 //			}
 
 
@@ -408,7 +429,9 @@ namespace device
 
 //							if(gtid==0 && sd==0 && td==0)
 //								printf("r: %f | gtid: %d \n",warpLine[gtid*group_length],gtid);
-//							output_correlationMatrixes[ (sd*3+td)*n_rsac+blockIdx.x*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
+
+							output_correlationMatrixes[ (sd*3+td)*n_rsac+blockIdx.x*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
+//
 //							if(blockIdx.x == 0 && threadIdx.x==0)
 //							{
 //								for(int i=0;i<groups_per_warp;i++)
@@ -1300,5 +1323,142 @@ void RigidBodyTransformationEstimator::execute()
 	*/
 
 
+}
+
+void
+RigidBodyTransformationEstimator::TestCorrelationMatrix(thrust::host_vector<float4> pos1,thrust::host_vector<float4> pos2, thrust::host_vector<float> correlationMatrix)
+{
+	thrust::host_vector<float4> h_pos(640*480*n_view);
+	for(size_t i = 0; i < pos1.size(); i++)
+	{
+		h_pos[i] 			= pos1[i];
+		h_pos[640*480+i] 	= pos2[i];
+	}
+	thrust::device_vector<float4> d_pos = h_pos;
+	deMeanedCorrelatonMEstimator.pos = thrust::raw_pointer_cast(d_pos.data());
+
+	thrust::host_vector<unsigned int> h_srcIdx(s);
+	for(size_t i = 0; i < s; i++)
+	{
+		h_srcIdx[i]=i;
+	}
+	thrust::device_vector<unsigned int> d_srcIdx = h_srcIdx;
+	deMeanedCorrelatonMEstimator.correspondanceIdxList = thrust::raw_pointer_cast(d_srcIdx.data());
+
+
+	thrust::host_vector<float> h_srcRndIdx(rn*deMeanedCorrelatonMEstimator.n_corresp);
+	thrust::host_vector<float> h_targetRndIdx(rn*deMeanedCorrelatonMEstimator.n_corresp);
+	for(size_t j = 0; j < rn; j++)
+	{
+		for(size_t i = 0; i < deMeanedCorrelatonMEstimator.n_corresp; i++)
+		{
+			h_srcRndIdx[j*deMeanedCorrelatonMEstimator.n_corresp+i] = ((float)i)/s;
+			h_targetRndIdx[j*deMeanedCorrelatonMEstimator.n_corresp+i] = 0.f;
+		}
+	}
+	thrust::device_vector<float> d_srcRndIdx = h_srcRndIdx;
+	thrust::device_vector<float> d_targetRndIdx = h_targetRndIdx;
+	deMeanedCorrelatonMEstimator.rnd_src = thrust::raw_pointer_cast(d_srcRndIdx.data());
+	deMeanedCorrelatonMEstimator.rnd_target = thrust::raw_pointer_cast(d_targetRndIdx.data());
+
+
+	thrust::host_vector<unsigned int> h_errorIdxList(s*k);
+	for(size_t i = 0; i < s; i++)
+	{
+		h_errorIdxList[i*k]=i;
+	}
+	thrust::device_vector<unsigned int> d_errorIdxList = h_errorIdxList;
+	deMeanedCorrelatonMEstimator.correspondanceErrorIdxList = thrust::raw_pointer_cast(d_errorIdxList.data());
+
+	deMeanedCorrelatonMEstimator.n_src = s;
+	deMeanedCorrelatonMEstimator.n_target = k;
+	deMeanedCorrelatonMEstimator.n_rsac = rn;
+
+	thrust::device_vector<float> d_correlationmatrix(rn*9);
+	thrust::device_vector<float> d_transformationMatrices(rn*12);
+	thrust::device_vector<int> d_transformationMetaDataList(1+rn*3);
+
+
+	deMeanedCorrelatonMEstimator.output_correlationMatrixes = thrust::raw_pointer_cast(d_correlationmatrix.data());
+	deMeanedCorrelatonMEstimator.output_transformationMatrices = thrust::raw_pointer_cast(d_transformationMatrices.data());
+	deMeanedCorrelatonMEstimator.output_transformationMetaData = thrust::raw_pointer_cast(d_transformationMetaDataList.data());
+
+	deMeanBlock = dim3(deMeanedCorrelatonMEstimator.threads,1);
+	deMeanGrid = dim3(rn/deMeanedCorrelatonMEstimator.n_matrices,1);
+
+	deMeanedCorrelatonMEstimator.view_src = 0;
+	deMeanedCorrelatonMEstimator.view_target = 1;
+	device::estimateCorrelationMatrix<<<deMeanGrid,deMeanBlock>>>(deMeanedCorrelatonMEstimator);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	unsigned int offset = 2;
+	thrust::host_vector<float> h_correlationmatrix = d_correlationmatrix;
+	for(size_t i = 0; i < 9; i++)
+	{
+		printf("%f ",h_correlationmatrix[i*rn+rn-1]);
+	}
+
+	printf("\n");
+
+	thrust::host_vector<float> h_transformationMatrices = d_transformationMatrices;
+	for(size_t i = 0; i < 12; i++)
+	{
+		printf("%f ",h_transformationMatrices[i*rn+rn-1]);
+	}
+
+//	thrust::host_vector<unsigned int> h_correspondanceErrorIdx(s*k);
+//	for(size_t i = 0; i < s; i++)
+//	{
+//		h_sIdx[i] = i;
+//		h_s_rnd[i] = i;
+//	}
+
+	/*
+	deMeanedCorrelatonMEstimator.pos = (float4 *)getInputDataPointer(Coordiantes);
+
+	deMeanedCorrelatonMEstimator.correspondanceErrorIdxList = (unsigned int *)getTargetDataPointer(ProbIdxList);
+	deMeanedCorrelatonMEstimator.correspondanceErrorList = (float *)getTargetDataPointer(ProbList);
+
+	deMeanedCorrelatonMEstimator.correspondanceIdxList = (unsigned int *)getTargetDataPointer(SIndices);
+
+	deMeanedCorrelatonMEstimator.n_src = s;
+	deMeanedCorrelatonMEstimator.n_target = k;
+	deMeanedCorrelatonMEstimator.rnd_src = (float *)getTargetDataPointer(RndSrcIndices);
+	deMeanedCorrelatonMEstimator.rnd_target = (float *)getTargetDataPointer(RndTargetIndices);
+
+	deMeanedCorrelatonMEstimator.n_rsac = rn;
+	deMeanedCorrelatonMEstimator.output_correlationMatrixes = (float *)getTargetDataPointer(CorrelationMatrices);
+	deMeanedCorrelatonMEstimator.output_transformationMatrices = (float *)getTargetDataPointer(TransformationMatrices);
+	deMeanedCorrelatonMEstimator.output_transformationMetaData = (int *)getTargetDataPointer(TransformationMetaDataList);
+
+	deMeanBlock = dim3(deMeanedCorrelatonMEstimator.threads,1);
+	deMeanGrid = dim3(rn/deMeanedCorrelatonMEstimator.n_matrices,1);
+	*/
+
+
+
+
+
+
+
+
+//	printf("matrix m: \n");
+//	for(size_t i = 0; i < pos1.size(); i++)
+//	{
+//		printf("(%f %f %f %f) ",pos1[i].x,pos1[i].y,pos1[i].z,pos1[i].w);
+//	}
+//
+//	printf("matrix d: \n");
+//	for(size_t i = 0; i < pos2.size(); i++)
+//	{
+//		printf("%f %f %f %f \n",pos2[i].x,pos2[i].y,pos2[i].z,pos2[i].w);
+//	}
+
+//	printf("matrix H: \n");
+//	for(size_t i = 0; i < correlationMatrix.size(); i++)
+//	{
+//		printf("%f ",correlationMatrix[i]);
+//	}
 }
 

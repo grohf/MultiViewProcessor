@@ -10,6 +10,7 @@
 #include <helper_cuda.h>
 #include <helper_image.h>
 
+#include "point_info.hpp"
 #include "TruncateThresholdFilter.h"
 #include <thrust/for_each.h>
 #include <thrust/device_vector.h>
@@ -36,8 +37,12 @@ namespace device
 //				printf(" %f %f %f \n",pos[off].x,pos[off].y,pos[off].z);
 
 			float4 wc = pos[off];
+			SegmentationPointInfo spi;
+			spi = Foreground;
 			if(wc.z < min || wc.z > max)
-				pos[off].z = -1.f;
+				spi = Background;
+
+			device::setSegmentationPointInfo(pos[off].w,spi);
 		}
 
 	};
@@ -85,5 +90,42 @@ void TruncateThresholdFilter::execute()
 	device::filterTruncateThreshold<<<grid,block>>>(truncator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+	size_t uc4s = 640*480*sizeof(uchar4);
+	char path[50];
+	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+	checkCudaErrors(cudaMemcpy(h_f4_depth,truncator.pos,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+//	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
+//	for(int i=0;i<640*480;i++)
+//	{
+//		unsigned char g = h_f4_depth[i].z/20;
+//		h_uc4_depth[i] = make_uchar4(g,g,g,128);
+//
+//		if(!device::isValid(h_f4_depth[i].w)) h_uc4_depth[i].x = 255;
+//
+//		if(device::isReconstructed(h_f4_depth[i].w)) h_uc4_depth[i].y = 255;
+//	}
+//
+//	sprintf(path,"/home/avo/pcds/src_depth_valid_map%d.ppm",0);
+//	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
+
+
+
+	uchar4 *h_uc4_depth2 = (uchar4 *)malloc(uc4s);
+	for(int i=0;i<640*480;i++)
+	{
+		unsigned char g = h_f4_depth[i].z/20;
+		h_uc4_depth2[i] = make_uchar4(g,g,g,128);
+
+		if(device::isForeground(h_f4_depth[i].w)) h_uc4_depth2[i].x = 255;
+
+		if(device::isBackground(h_f4_depth[i].w)) h_uc4_depth2[i].y = 255;
+
+		if(!device::isSegmented(h_f4_depth[i].w)) h_uc4_depth2[i].z = 255;
+	}
+
+	sprintf(path,"/home/avo/pcds/src_segmented_map%d.ppm",0);
+	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth2,640,480);
 
 }

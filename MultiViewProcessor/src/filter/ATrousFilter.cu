@@ -10,6 +10,8 @@
 #include <helper_cuda.h>
 #include <helper_image.h>
 
+
+#include "point_info.hpp"
 #include "ATrousFilter.h"
 
 //Test
@@ -48,11 +50,14 @@ namespace device
 		float4* input;
 		float4* output;
 
+		float *input_intensity;
+
 		__device__ __forceinline__ void
 		operator () () const
 		{
 
-			__shared__ float4 shm[36*28];
+			__shared__ float4 shm_pos[36*28];
+			__shared__ float shm_intensity[36*28];
 
 			int off,sx,sy;
 
@@ -163,7 +168,8 @@ namespace device
 				if(sy < 0)		sy 	= 	0;
 				if(sy > 479)	sy 	= 479;
 
-				shm[off]=input[blockIdx.z*640*480+sy*640+sx];
+				shm_pos[off] = input[blockIdx.z*640*480+sy*640+sx];
+				shm_intensity[off] = input_intensity[blockIdx.z*640*480+sy*640+sx];
 			}
 			__syncthreads();
 
@@ -174,8 +180,8 @@ namespace device
 			float sum = 0.0f;
 			float sum_weight = 0.0f;
 
-			float mid_depth = shm[off].z;
-			float mid_luma = shm[off].w;
+			float mid_depth = shm_pos[off].z;
+			float mid_luma = shm_pos[off].w;
 
 			float cur_depth;
 
@@ -185,7 +191,7 @@ namespace device
 				for(sx=0;sx<constant::atrous_length;sx++)
 				{
 					off = (threadIdx.y+sy)*constant::lx+threadIdx.x+sx;
-					cur_depth = shm[off].z;
+					cur_depth = shm_pos[off].z;
 
 					weight = constant::atrous_coef[sy*constant::atrous_length+sx];
 					if(cur_depth==0.0f) weight = 0.0f;
@@ -197,7 +203,7 @@ namespace device
 
 					if(sigma_intensity > 0)
 					{
-						 weight *= __expf(-0.5f*(abs(mid_luma-shm[off].w)/(sigma_intensity * sigma_intensity)));
+						 weight *= __expf(-0.5f*(abs(mid_luma-shm_pos[off].w)/(sigma_intensity * sigma_intensity)));
 					}
 
 					sum += weight * cur_depth;
@@ -205,8 +211,8 @@ namespace device
 				}
 			}
 
-			if(mid_depth==0)
-				sum_weight = 0.f;
+//			if(mid_depth==0)
+//				sum_weight = 0.f;
 
 			/* ---------- SAVE ----------- */
 
@@ -220,11 +226,21 @@ namespace device
 //	////			surf3Dwrite<uchar4>(u4,surf::surfOutRef,sx*sizeof(uchar4),sy,blockIdx.z);
 //	//
 			off = (threadIdx.y+constant::atrous_radi)*constant::lx+threadIdx.x+constant::atrous_radi;
-			shm[off].z = (sum_weight>0)?(sum/sum_weight):0;
+			shm_pos[off].z = (sum_weight>0)?(sum/sum_weight):0;
+//			shm_pos[off].w = 0;
+
+			if(sum_weight>0)
+			{
+				setValid(shm_pos[off].w);
+				if(mid_depth==0)
+					setReconstructed(shm_pos[off].w);
+			}
+
+
 //			surf3Dwrite<float4>(shm[off],surf::surfRefBuffer,sx*sizeof(float4),sy,blockIdx.z);
 			output[blockIdx.z*640*480
 			       +(oy+constant::atrous_radi*constant::level2step_size[level]+sy*constant::level2step_size[level])*640
-			       +(ox+constant::atrous_radi*constant::level2step_size[level]+sx*constant::level2step_size[level])] = shm[off];
+			       +(ox+constant::atrous_radi*constant::level2step_size[level]+sx*constant::level2step_size[level])] = shm_pos[off];
 
 //				float4 f4t = make_float4(0,0,500,0);
 //				surf3Dwrite<float4>(f4t,surf::surfRefBuffer,sx*sizeof(float4),sy,0);
@@ -320,26 +336,30 @@ void ATrousFilter::execute()
 	checkCudaErrors(cudaDeviceSynchronize());
 
 
-//	size_t uc4s = 640*480*sizeof(uchar4);
+	size_t uc4s = 640*480*sizeof(uchar4);
 ////	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
 ////	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
 ////
-//	char path[50];
+	char path[50];
 ////	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
 ////	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
 ////
-//	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-//	checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-//
-//	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
-//	for(int i=0;i<640*480;i++)
-//	{
-//		unsigned char g = h_f4_depth[i].z/20;
-//		h_uc4_depth[i] = make_uchar4(g,g,g,128);
-//	}
-//
-//	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
-//	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
+	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+	checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
+	for(int i=0;i<640*480;i++)
+	{
+		unsigned char g = h_f4_depth[i].z/20;
+		h_uc4_depth[i] = make_uchar4(g,g,g,128);
+
+		if(!device::isValid(h_f4_depth[i].w)) h_uc4_depth[i].x = 255;
+
+		if(device::isReconstructed(h_f4_depth[i].w)) h_uc4_depth[i].y = 255;
+	}
+
+	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
+	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 
 
 
@@ -373,8 +393,9 @@ void ATrousFilter::init()
 	atrousfilter.sigma_depth = sigma_depth;
 	atrousfilter.sigma_intensity = sigma_intensity;
 
-	atrousfilter.input = (float4 *)getInputDataPointer(0);
-	atrousfilter.output = (float4 *)getTargetDataPointer(0);
+	atrousfilter.input = (float4 *)getInputDataPointer(WorldCoordinates);
+	atrousfilter.input_intensity = (float *)getInputDataPointer(PointIntensity);
+	atrousfilter.output = (float4 *)getTargetDataPointer(FilteredWorldCoordinates);
 
 
 //	printf("atrous_radi: %d \n",atrous_radi);
@@ -383,7 +404,7 @@ void ATrousFilter::init()
 
 	initAtrousConstants();
 
-	SensorInfo *d_sinfo = (SensorInfo *)getInputDataPointer(1);
+	SensorInfo *d_sinfo = (SensorInfo *)getInputDataPointer(SensorInfoList);
 	cudaMemcpyToSymbol(device::constant::sensorInfo_pix_size,&(d_sinfo->pix_size),sizeof(double),0,cudaMemcpyDeviceToDevice);
 	cudaMemcpyToSymbol(device::constant::sensorInfo_dist,&(d_sinfo->dist),sizeof(double),0,cudaMemcpyDeviceToDevice);
 
@@ -393,7 +414,7 @@ void ATrousFilter::init()
 //	printf("host: pix_size: %f | dist %f \n",h_sinfo.pix_size,h_sinfo.dist);
 
 
-	coordsUpdater.pos = (float4 *)getTargetDataPointer(0);
+	coordsUpdater.pos = (float4 *)getTargetDataPointer(FilteredWorldCoordinates);
 }
 
 void ATrousFilter::initAtrousConstants()

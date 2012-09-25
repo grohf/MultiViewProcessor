@@ -25,6 +25,7 @@ public:
 
 		PointXYZI,
 		PointRGBA,
+		PointIntensity,
 		SensorInfoList,
 
 		ImageDepth,
