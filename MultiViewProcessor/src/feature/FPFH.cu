@@ -15,6 +15,7 @@
 #include <thrust/device_malloc.h>
 #include <thrust/device_free.h>
 
+#include "point_info.hpp"
 
 #include "../sink/pcd_io.h"
 #include "utils.hpp"
@@ -158,7 +159,7 @@ namespace device
 				for(int i=0;i<8;i++)
 					mid_bin[i]=0;
 
-				if(mid_pos.z==0)
+				if(mid_pos.z==0 || isBackground(mid_pos.w))
 				{
 					for(int i=0;i<8;i++)
 						output_bins[mid_global_off*8+i] = -1;
@@ -177,7 +178,7 @@ namespace device
 //						float4 cur_pos = input_pos
 						float4 cur_normal = shm_normal[off];
 
-						if(cur_pos.z==0)
+						if(!isValid(cur_pos.w))
 						{
 							invalid_points++;
 							continue;
@@ -240,7 +241,7 @@ namespace device
 				}
 
 				for(int i=0;i<8;i++)
-					output_bins[mid_global_off*8+i] = (point_count > 0 && invalid_points/point_count < 0.6)?((float)mid_bin[i])/((float)point_count):-1;
+					output_bins[mid_global_off*8+i] = (point_count > 0 && invalid_points/point_count < 0.3)?((float)mid_bin[i])/((float)point_count):-1;
 
 
 			}
@@ -340,7 +341,7 @@ namespace device
 
 				float4 mid_pos = input_pos[blockIdx.z*640*480+gy*640+gx];
 
-				if(spfh_input[(blockIdx.z*640*480+gy*640+gx)*8+0]==-1)
+				if(spfh_input[(blockIdx.z*640*480+gy*640+gx)*8+0]==-1 ||  getReconstructionLevel(mid_pos.w)>0 ||   !isForeground(mid_pos.w) )
 				{
 					for(int i=0;i<8;i++)
 					{
@@ -385,7 +386,7 @@ namespace device
 
 						if(cur_pos.z==0)
 						{
-							printf("What shouldn't HAPPEN PART II!!! (%d/%d) \n",ix,iy);
+							printf("this shouldn't HAPPEN PART II!!! (%d/%d) \n",ix,iy);
 							continue;
 						}
 

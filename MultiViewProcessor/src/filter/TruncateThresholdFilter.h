@@ -39,6 +39,7 @@ public:
 	{
 		addInputData(ddip,0);
 	}
+
 };
 
 #endif /* TRUNCATETHRESHOLDFILTER_H_ */

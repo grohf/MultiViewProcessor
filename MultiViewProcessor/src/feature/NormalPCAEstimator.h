@@ -8,6 +8,7 @@
 #ifndef NORMALPCAESTIMATOR_H_
 #define NORMALPCAESTIMATOR_H_
 
+#include <thrust/host_vector.h>
 #include "feature.hpp"
 
 class NormalPCAEstimator : public Feature {
@@ -42,6 +43,9 @@ public:
 	void setWorldCoordinates(DeviceDataInfoPtr ddip){
 		addInputData(ddip,WorldCoordinates);
 	}
+
+
+	void TestNormalCreater(thrust::host_vector<float4>& views,thrust::host_vector<float4>& normals);
 };
 
 #endif /* NORMALPCAESTIMATOR_H_ */

@@ -8,6 +8,8 @@
 #ifndef SYNCFREENECTSOURCE_H_
 #define SYNCFREENECTSOURCE_H_
 
+#include <thrust/host_vector.h>
+
 #include <source.h>
 #include <vector_types.h>
 #include <stdint.h>
@@ -38,6 +40,8 @@ public:
 	void init();
 	void loadFrame();
 
+
+	void TestSyncnectSource(thrust::host_vector<float4>& views);
 //	void close();
 
 private:

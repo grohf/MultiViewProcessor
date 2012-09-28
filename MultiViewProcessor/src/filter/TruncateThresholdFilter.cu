@@ -42,7 +42,8 @@ namespace device
 			if(wc.z < min || wc.z > max)
 				spi = Background;
 
-			device::setSegmentationPointInfo(pos[off].w,spi);
+			device::setSegmentationPointInfo(wc.w,spi);
+			pos[off] = wc;
 		}
 
 	};

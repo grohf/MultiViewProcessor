@@ -8,6 +8,7 @@
 #ifndef ATROUSFILTER_H_
 #define ATROUSFILTER_H_
 
+#include <thrust/host_vector.h>
 #include "filter.hpp"
 
 
@@ -73,6 +74,8 @@ public:
 	{
 		return getTargetData(FilteredWorldCoordinates);
 	}
+
+	void TestAtrousFilter(thrust::host_vector<float4>& views);
 
 private:
 	void initAtrousConstants();

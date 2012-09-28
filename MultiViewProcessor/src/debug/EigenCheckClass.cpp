@@ -11,6 +11,10 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <libfreenect_sync.h>
+#include <libfreenect.h>
+
+#include "../sink/pcd_io.h"
 #include "EigenCheckClass.h"
 
 EigenCheckClass::EigenCheckClass()
@@ -225,4 +229,126 @@ EigenCheckClass::createTestOMRotation()
 	}
 
 	std::cout << "Here is the CorrelationMatrix HM :\n" << HM << std::endl;
+}
+
+void
+EigenCheckClass::createRotatedViews(thrust::host_vector<float4>& views, thrust::host_vector<float4>& views_synth, thrust::host_vector<float4>& normals, thrust::host_vector<float4>& normals_synth, thrust::host_vector<float>& transforamtionmatrix)
+{
+	srand(time(NULL));
+		Eigen::Vector3f angles = Eigen::Vector3f::Random(3) * (2 * M_PI);
+
+		printf("angles: %f %f %f \n",angles(0),angles(1),angles(2));
+
+		Eigen::Matrix3f MR2;
+		MR2	= Eigen::AngleAxisf(angles(0),Eigen::Vector3f::UnitX())
+			* Eigen::AngleAxisf(angles(1),Eigen::Vector3f::UnitY())
+			* Eigen::AngleAxisf(angles(2),Eigen::Vector3f::UnitZ());
+
+		std::cout << "RotationMatrix :\n" << MR2 << std::endl;
+	//	std::cout << " det: " << MR2.determinant() << std::endl;
+
+		Eigen::Vector3f mt = Eigen::Vector3f::Random(3)*500.f;
+//		std::cout << "TranslationVector :\n" << mt << std::endl;
+
+
+		Eigen::MatrixXf src = Eigen::MatrixXf::Zero(3,views.size());
+		Eigen::MatrixXf src_normals = Eigen::MatrixXf::Zero(3,views.size());
+
+		float *data = src.data();
+		float *data_normals = src_normals.data();
+		for(int i=0;i<views.size();i++)
+		{
+			data[i*3+0] = views[i].x;
+			data[i*3+1] = views[i].y;
+			data[i*3+2] = views[i].z;
+
+			data_normals[i*3+0] = normals[i].x;
+			data_normals[i*3+1] = normals[i].y;
+			data_normals[i*3+2] = normals[i].z;
+		}
+
+//		Eigen::Vector3f t = src.block<3,1>(0,50000);
+//		std::cout << "Here is the t :\n" << t << std::endl;
+
+		Eigen::MatrixXf target = Eigen::MatrixXf::Zero (3,views.size());
+		Eigen::MatrixXf target_normals = Eigen::MatrixXf::Zero (3,views.size());
+		for(int i=0;i<views.size();i++)
+		{
+			target.block<3,1>(0,i) = MR2 * src.block<3,1>(0,i) + mt;
+			target_normals.block<3,1>(0,i) = MR2 * src_normals.block<3,1>(0,i);
+		}
+
+		data = target.data();
+		data_normals = target_normals.data();
+		for(int i=0;i<views.size();i++)
+		{
+			views_synth[i].x = data[i*3+0];
+			views_synth[i].y = data[i*3+1];
+			views_synth[i].z = data[i*3+2];
+			views_synth[i].w = 0;
+
+			normals_synth[i].x = data_normals[i*3+0];
+			normals_synth[i].y = data_normals[i*3+1];
+			normals_synth[i].z = data_normals[i*3+2];
+			normals_synth[i].w = 0;
+		}
+
+
+		data = MR2.data();
+		for(int i=0;i<9;i++)
+		{
+			transforamtionmatrix[i] = data[i];
+		}
+
+		Eigen::Vector3f mtr = -1 * ( MR2.transpose() * mt);
+		std::cout << "ReTranslationVector :\n" << mtr << std::endl;
+
+		data = mtr.data();
+		for(int i=0;i<3;i++)
+		{
+			transforamtionmatrix[9+i] = data[i];
+//			data[i] -= 5;
+		}
+
+//	 Test
+//		char path[50];
+//		host::io::PCDIOController pcdIOCtrl;
+//
+//		sprintf(path,"/home/avo/pcds/src_real_points_%d.pcd",0);
+//		pcdIOCtrl.writeASCIIPCD(path,(float *)views.data(),640*480);
+//
+//
+//
+//
+//		sprintf(path,"/home/avo/pcds/src_synth_points_%d.pcd",0);
+//		pcdIOCtrl.writeASCIIPCD(path,(float *)views_synth.data(),640*480);
+//
+//		sprintf(path,"/home/avo/pcds/src_synth_normals_%d.pcd",0);
+//		pcdIOCtrl.writeASCIIPCDNormals(path,(float *)normals_synth.data(),640*480);
+//
+//		//Test rerotate!
+//
+//
+//
+//		Eigen::MatrixXf rerotated = Eigen::MatrixXf::Zero (3,views.size());
+//		for(int i=0;i<views.size();i++)
+//		{
+//			rerotated.block<3,1>(0,i) = MR2.transpose() * target.block<3,1>(0,i) + mtr;
+//		}
+//
+//		thrust::host_vector<float4> synth_retransformed(640*480);
+//
+//		data = rerotated.data();
+//		for(int i=0;i<synth_retransformed.size();i++)
+//		{
+//			synth_retransformed[i].x = data[i*3+0];
+//			synth_retransformed[i].y = data[i*3+1];
+//			synth_retransformed[i].z = data[i*3+2];
+//		}
+//
+//		sprintf(path,"/home/avo/pcds/src_retransformed_points_%d.pcd",0);
+//		pcdIOCtrl.writeASCIIPCD(path,(float *)synth_retransformed.data(),640*480);
+
+
+//		freenect_sync_stop();
 }

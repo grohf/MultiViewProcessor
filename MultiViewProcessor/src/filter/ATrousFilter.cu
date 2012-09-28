@@ -10,6 +10,7 @@
 #include <helper_cuda.h>
 #include <helper_image.h>
 
+#include <thrust/device_vector.h>
 
 #include "point_info.hpp"
 #include "ATrousFilter.h"
@@ -233,7 +234,7 @@ namespace device
 			{
 				setValid(shm_pos[off].w);
 				if(mid_depth==0)
-					setReconstructed(shm_pos[off].w);
+					setReconstructed(shm_pos[off].w,level);
 			}
 
 
@@ -306,6 +307,10 @@ void ATrousFilter::execute()
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
+		device::updateCoords<<<grid,block>>>(coordsUpdater);
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
 		for(int l=1;l<iterations;l++)
 		{
 			printf("iteraten: %d \n",l);
@@ -313,6 +318,10 @@ void ATrousFilter::execute()
 
 			atrousfilter.level = l;
 			device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
+			checkCudaErrors(cudaGetLastError());
+			checkCudaErrors(cudaDeviceSynchronize());
+
+			device::updateCoords<<<grid,block>>>(coordsUpdater);
 			checkCudaErrors(cudaGetLastError());
 			checkCudaErrors(cudaDeviceSynchronize());
 		}
@@ -331,9 +340,9 @@ void ATrousFilter::execute()
 //	checkCudaErrors(cudaGetLastError());
 //	checkCudaErrors(cudaDeviceSynchronize());
 
-	device::updateCoords<<<grid,block>>>(coordsUpdater);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
+//	device::updateCoords<<<grid,block>>>(coordsUpdater);
+//	checkCudaErrors(cudaGetLastError());
+//	checkCudaErrors(cudaDeviceSynchronize());
 
 
 	size_t uc4s = 640*480*sizeof(uchar4);
@@ -367,7 +376,7 @@ void ATrousFilter::execute()
 
 //	 Test
 //		char path[50];
-//
+
 //		for(int i=0;i<n_view;i++)
 //		{
 //			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
@@ -466,7 +475,24 @@ void ATrousFilter::initAtrousConstants()
 }
 
 
+void
+ATrousFilter::TestAtrousFilter(thrust::host_vector<float4>& views)
+{
 
+	block = dim3(32,24);
+	grid = dim3(640/block.x,480/block.y,n_view);
+
+	atrousfilter.modi = 1 | 2 | 4;
+	atrousfilter.level = 0;
+	atrousfilter.sigma_depth = sigma_depth;
+	atrousfilter.sigma_intensity = sigma_intensity;
+
+
+//	thrust::device_vector<float4> d_views
+	atrousfilter.input = (float4 *)getInputDataPointer(WorldCoordinates);
+	atrousfilter.input_intensity = (float *)getInputDataPointer(PointIntensity);
+	atrousfilter.output = (float4 *)getTargetDataPointer(FilteredWorldCoordinates);
+}
 
 
 //void shrinkData(DeviceDataParams &params)

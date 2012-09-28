@@ -1240,29 +1240,29 @@ void RigidBodyTransformationEstimator::execute()
 //	}
 
 
-	float *h_m = (float *)malloc(rn*12*sizeof(float));
-	checkCudaErrors( cudaMemcpy(h_m,deMeanedCorrelatonMEstimator.output_transformationMatrices,rn*12*sizeof(float),cudaMemcpyDeviceToHost));
+//	float *h_m = (float *)malloc(rn*12*sizeof(float));
+//	checkCudaErrors( cudaMemcpy(h_m,deMeanedCorrelatonMEstimator.output_transformationMatrices,rn*12*sizeof(float),cudaMemcpyDeviceToHost));
 
-	for(int l=3;l<length;l+=32)
-	{
-//		int l = 16;
-		int i = h_metadata[1+l];
-		float det = 0.f;
-		det += h_m[0*rn+i]*h_m[4*rn+i]*h_m[8*rn+i];
-		det += h_m[1*rn+i]*h_m[5*rn+i]*h_m[6*rn+i];
-		det += h_m[2*rn+i]*h_m[3*rn+i]*h_m[7*rn+i];
-
-		det -= h_m[2*rn+i]*h_m[4*rn+i]*h_m[6*rn+i];
-		det -= h_m[1*rn+i]*h_m[3*rn+i]*h_m[8*rn+i];
-		det -= h_m[0*rn+i]*h_m[5*rn+i]*h_m[7*rn+i];
-
-		printf("(%d | %d | %.1f)",l,i,det);
-		for(int d=0;d<12;d++)
-		{
-			printf(" | %.2f",h_m[d*rn+i]);
-		}
-		printf("\n");
-	}
+//	for(int l=3;l<length;l+=32)
+//	{
+////		int l = 16;
+//		int i = h_metadata[1+l];
+//		float det = 0.f;
+//		det += h_m[0*rn+i]*h_m[4*rn+i]*h_m[8*rn+i];
+//		det += h_m[1*rn+i]*h_m[5*rn+i]*h_m[6*rn+i];
+//		det += h_m[2*rn+i]*h_m[3*rn+i]*h_m[7*rn+i];
+//
+//		det -= h_m[2*rn+i]*h_m[4*rn+i]*h_m[6*rn+i];
+//		det -= h_m[1*rn+i]*h_m[3*rn+i]*h_m[8*rn+i];
+//		det -= h_m[0*rn+i]*h_m[5*rn+i]*h_m[7*rn+i];
+//
+//		printf("(%d | %d | %.1f)",l,i,det);
+//		for(int d=0;d<12;d++)
+//		{
+//			printf(" | %.2f",h_m[d*rn+i]);
+//		}
+//		printf("\n");
+//	}
 
 
 

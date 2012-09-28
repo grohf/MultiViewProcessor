@@ -25,6 +25,9 @@ public:
 
 	void testSVD();
 	void createTestOMRotation();
+
+	void createRotatedViews(thrust::host_vector<float4>& views, thrust::host_vector<float4>& views_synth, thrust::host_vector<float4>& normals, thrust::host_vector<float4>& normals_synth, thrust::host_vector<float>& transforamtionmatrix);
+
 };
 
 #endif /* EIGENCHECKCLASS_H_ */

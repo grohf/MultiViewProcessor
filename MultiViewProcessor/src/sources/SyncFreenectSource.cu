@@ -15,6 +15,7 @@
 #include "SyncFreenectSource.h"
 #include <vector_types.h>
 
+#include <thrust/device_vector.h>
 
 //TODO: get deviceMemory stuff out here
 #include <helper_cuda.h>
@@ -304,3 +305,111 @@ SyncFreenectSource::~SyncFreenectSource()
 	printf("sync freenect stopped \n");
 }
 
+
+void
+SyncFreenectSource::TestSyncnectSource(thrust::host_vector<float4>& views)
+{
+
+//	uint16_t *h_depth = 0;
+//	uint8_t *h_rgb = 0;
+//	uint32_t ts;
+//
+//	freenect_sync_get_depth((void**)&h_depth, &ts, 0, FREENECT_DEPTH_REGISTERED);
+//	freenect_sync_get_video((void**)&h_rgb, &ts, 0, FREENECT_VIDEO_RGB);
+//
+//	thrust::host_vector<uint16_t> h_depth2(640*480*n_view);
+//	thrust::host_vector<uint8_t> h_rgb2(640*480*3*n_view);
+//	for(int i=0;i<h_depth2.size();i++)
+//	{
+//		h_depth2[i] = h_depth[i];
+//	}
+//	for(int i=0;i<h_rgb2.size();i++)
+//	{
+//		h_rgb2[i] = h_rgb[i];
+//	}
+//
+//	thrust::device_vector<uint16_t> d_depth2 = h_depth2;
+//	thrust::device_vector<uint8_t> d_rgb2 = h_rgb2;
+//
+////	thrust::device_vector<uint16_t> d_depth2(640*480*n_view);
+////	thrust::device_vector<uint8_t> d_rgb2(640*480*n_view);
+////
+////	loader.depth = thrust::raw_pointer_cast(d_depth2.data());
+////	loader.rgb = thrust::raw_pointer_cast(d_rgb2.data());
+////
+////	for(int v=0;v<n_view;v++)
+////	{
+////		uint16_t *h_depth = 0;
+////		uint8_t *h_rgb = 0;
+////		uint32_t ts;
+////
+////		freenect_sync_get_depth((void**)&h_depth, &ts, v, FREENECT_DEPTH_REGISTERED);
+////		freenect_sync_get_video((void**)&h_rgb, &ts, v, FREENECT_VIDEO_RGB);
+////
+////		checkCudaErrors(cudaMemcpy(loader.rgb + v*640*480*3,h_rgb,640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
+////		checkCudaErrors(cudaMemcpy(loader.depth + v*640*480,h_depth,640*480*sizeof(uint16_t),cudaMemcpyHostToDevice));
+////
+////	}
+//
+//	thrust::device_vector<float4> d_xyzi(640*480*n_view);
+//	thrust::device_vector<uchar4> d_rgba(640*480*n_view);
+//	thrust::device_vector<float> d_intensity(640*480*n_view);
+//
+//	loader.xyzi = thrust::raw_pointer_cast(d_xyzi.data());
+//	loader.rgba = thrust::raw_pointer_cast(d_rgba.data());
+//	loader.intensity = thrust::raw_pointer_cast(d_intensity.data());
+//
+////	printf("pointer xyzi: %d \n",loader.xyzi);
+//
+//	block = dim3(32,24);
+//	grid = dim3(640/block.x,480/block.y,n_view);
+//
+//	cudaMemcpyToSymbol(device::constant::ref_pix_size,&ref_pix_size,sizeof(double));
+//	cudaMemcpyToSymbol(device::constant::ref_dist,&ref_dist,sizeof(double));
+//
+//	SensorInfo sinfo;
+//	sinfo.pix_size = 2*ref_pix_size;
+//	sinfo.dist = ref_dist;
+//
+//
+////	thrust::device_vector<SensorInfo> d_sinfo2(1*sizeof(SensorInfo));
+////	SensorInfo *d_sinfoList = thrust::raw_pointer_cast(d_sinfo2.data());
+////	checkCudaErrors(cudaMemcpy(d_sinfoList,&sinfo,1*sizeof(SensorInfo),cudaMemcpyHostToDevice));
+//
+//	device::loadSyncFreenectFrame<<<grid,block>>>(loader);
+//	checkCudaErrors(cudaGetLastError());
+//	checkCudaErrors(cudaDeviceSynchronize());
+
+
+	uint16_t *h_depth = 0;
+	uint8_t *h_rgb = 0;
+	uint32_t ts;
+
+	freenect_sync_get_depth((void**)&h_depth, &ts, 0, FREENECT_DEPTH_REGISTERED);
+	freenect_sync_get_video((void**)&h_rgb, &ts, 0, FREENECT_VIDEO_RGB);
+
+	for(int i=0;i<views.size()/2;i++)
+	{
+		int y = i/640;
+		int x = i - y*640;
+		float wz = h_depth[i];
+
+//			if(wz > 0) printf("%f \n",wz);
+
+		float wx = (x-320.) * ((0.2084 * wz)/(120.));
+		float wy = (y-320.) * ((0.2084 * wz)/(120.));
+
+		views[i].x = wx;
+		views[i].y = wy;
+		views[i].z = wz;
+		views[i].w = 0;
+	}
+
+
+	char path[50];
+	host::io::PCDIOController pcdIOCtrl;
+
+	sprintf(path,"/home/avo/pcds/src_points_%d.pcd",0);
+	pcdIOCtrl.writeASCIIPCD(path,(float *)views.data(),640*480);
+
+}

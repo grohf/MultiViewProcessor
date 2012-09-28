@@ -5,7 +5,7 @@
  *      Author: avo
  */
 
-#include "FPFHEstimator2.h"
+#include "DFPFHEstimator.h"
 
 namespace device
 {
@@ -14,26 +14,29 @@ namespace device
 
 
 void
-FPFHEstimator2::init()
+DFPFHEstimator::init()
 {
 
 }
+
 
 void
-FPFHEstimator2::execute()
+DFPFHEstimator::execute()
 {
 
 }
 
 
 
-FPFHEstimator2::FPFHEstimator2()
+
+
+DFPFHEstimator::DFPFHEstimator()
 {
 	// TODO Auto-generated constructor stub
 
 }
 
-FPFHEstimator2::~FPFHEstimator2()
+DFPFHEstimator::~DFPFHEstimator()
 {
 	// TODO Auto-generated destructor stub
 }

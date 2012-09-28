@@ -21,6 +21,10 @@
 
 #include <helper_cuda_gl.h>
 
+#include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
+#include <thrust/host_vector.h>
+
 #include "../sources/SyncFreenectSource.h"
 #include "../filter/TestFilter.h"
 #include "../filter/TestFilter2.h"
@@ -171,6 +175,71 @@ void TesterFct()
 	printf("%d %d %d",device::isForeground(f),device::isBackground(f),device::isSegmented(f));
 }
 
+void TestTransformationerror()
+{
+
+	SyncFreenectSource *src = new SyncFreenectSource(1);
+	//	SourcePtr src(new SyncFreenectSource());
+
+	Processor p;
+	p.setSource(SourcePtr(src));
+
+//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
+//	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
+//	p.addFilter(FilterPtr(truncateThresholdFilter));
+
+	ATrousFilter *atrousfilter = new ATrousFilter(1,2,10,5,2);
+	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
+	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
+	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
+	p.addFilter(FilterPtr(atrousfilter));
+
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1);
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(nPCAestimator);
+
+	p.start();
+
+
+	thrust::device_ptr<float4> d_views_ptr = thrust::device_pointer_cast((float4 *)atrousfilter->getFilteredWorldCoordinates()->getDeviceDataPtr().get());
+	thrust::device_ptr<float4> d_normals_ptr = thrust::device_pointer_cast((float4 *)nPCAestimator->getNormals()->getDeviceDataPtr().get());
+
+	thrust::device_vector<float4> d_views(d_views_ptr, d_views_ptr+640*480);
+	thrust::device_vector<float4> d_normals(d_normals_ptr, d_normals_ptr+640*480);
+
+	thrust::host_vector<float4> views = d_views;
+	thrust::host_vector<float4> normals = d_normals;
+
+	thrust::host_vector<float4> views_synth(views.size());
+	thrust::host_vector<float4> normals_synth(normals.size());
+
+	thrust::host_vector<float> transformationMatrix(12);
+
+	EigenCheckClass *cpuCheck = new EigenCheckClass();
+	cpuCheck->createRotatedViews(views,views_synth,normals,normals_synth,transformationMatrix);
+
+	for(int i=0;i<12;i++)
+	{
+		printf("%f | ",transformationMatrix[i]);
+	}
+	printf("\n");
+	TranformationValidator *validator = new TranformationValidator(2,32);
+	validator->TestTransformError(views,views_synth,normals,normals_synth,transformationMatrix);
+
+	/*
+	thrust::host_vector<float4> normals(views.size());
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2);
+	nPCAestimator->TestNormalCreater(views,normals);
+
+
+
+	TranformationValidator *validator = new TranformationValidator(2,1);
+//	validator->TestTransformError(synth_view,src_view,transformationMatrix);
+*/
+	src->~SyncFreenectSource();
+}
+
+
 void PointInfoTest()
 {
 	SyncFreenectSource *src = new SyncFreenectSource(2);
@@ -193,6 +262,31 @@ void PointInfoTest()
 	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(FilterPtr(truncateThresholdFilter));
 
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2);
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(nPCAestimator);
+
+	FPFH *fpfhEstimator = new FPFH(2);
+	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	fpfhEstimator->setNormals(nPCAestimator->getNormals());
+	p.addFeature(fpfhEstimator);
+
+	unsigned int r_ransac = 1024;
+
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,512,32);
+	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
+	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
+	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
+	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(rbEstimator);
+
+	TranformationValidator *validator = new TranformationValidator(2,r_ransac);
+	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+	validator->setNormals(nPCAestimator->getNormals());
+	validator->setSensorInfoList(src->getTargetData(SyncFreenectSource::SensorInfoList));
+	validator->setTransformationmatrices(rbEstimator->getTransformationMatrices());
+	validator->setTranformationInfoList(rbEstimator->getTransformationInfoList());
+	p.addFeature(validator);
 
 
 	p.start();
@@ -208,7 +302,11 @@ int main(int argc, char **argv) {
 //	runTestProcessor();
 
 //	TesterFct();
-	PointInfoTest();
+	TestTransformationerror();
+//	PointInfoTest();
+
+
+
 
 //	runMultiViewTest();
 	return 0;

@@ -10,6 +10,7 @@
 
 #include "feature.hpp"
 
+#include <thrust/host_vector.h>
 
 class TranformationValidator : public Feature {
 
@@ -97,6 +98,8 @@ public:
 	void TestMinimumPicker();
 	void TestSumCalculator();
 	void TestTransform();
+
+	void TestTransformError(thrust::host_vector<float4> v0,thrust::host_vector<float4> v1, thrust::host_vector<float4> n0, thrust::host_vector<float4> n1, thrust::host_vector<float> transform);
 
 };
 
