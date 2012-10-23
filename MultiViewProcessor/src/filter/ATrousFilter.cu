@@ -264,8 +264,8 @@ namespace device
 //			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
 //				printf("factor: %f ref_pix_size: %f ref_dist: %f \n",factor,constant::sensorInfo_pix_size,constant::sensorInfo_dist);
 
-			wx = (float) ((cx - 320) * factor);
-			wy = (float) ((cy - 240) * factor);
+			wx = (float) ((cx + 0.5 - 320) * factor);
+			wy = (float) ((cy + 0.5 - 240) * factor);
 
 		}
 

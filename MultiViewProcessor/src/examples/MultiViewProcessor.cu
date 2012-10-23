@@ -93,9 +93,9 @@ void runMultiViewTest()
 	Processor p;
 	p.setSource(SourcePtr(src));
 
-//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
-//	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
-//	p.addFilter(FilterPtr(truncateThresholdFilter));
+	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,3000.f);
+	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
+	p.addFilter(FilterPtr(truncateThresholdFilter));
 
 	ATrousFilter *atrousfilter = new ATrousFilter(2,2,10,5,2);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
@@ -113,7 +113,7 @@ void runMultiViewTest()
 	fpfhEstimator->setNormals(nPCAestimator->getNormals());
 	p.addFeature(fpfhEstimator);
 
-	unsigned int r_ransac = 256;
+	unsigned int r_ransac = 4096;
 
 	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,64,32);
 	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
@@ -218,12 +218,12 @@ void TestTransformationerror()
 	EigenCheckClass *cpuCheck = new EigenCheckClass();
 	cpuCheck->createRotatedViews(views,views_synth,normals,normals_synth,transformationMatrix);
 
-	for(int i=0;i<12;i++)
-	{
-		printf("%f | ",transformationMatrix[i]);
-	}
-	printf("\n");
-	TranformationValidator *validator = new TranformationValidator(2,32);
+//	for(int i=0;i<12;i++)
+//	{
+//		printf("%f | ",transformationMatrix[i]);
+//	}
+//	printf("\n");
+	TranformationValidator *validator = new TranformationValidator(2,64);
 	validator->TestTransformError(views,views_synth,normals,normals_synth,transformationMatrix);
 
 	/*
@@ -302,12 +302,12 @@ int main(int argc, char **argv) {
 //	runTestProcessor();
 
 //	TesterFct();
-	TestTransformationerror();
+//	TestTransformationerror();
 //	PointInfoTest();
 
 
 
 
-//	runMultiViewTest();
+	runMultiViewTest();
 	return 0;
 }

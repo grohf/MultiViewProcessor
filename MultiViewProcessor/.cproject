@@ -104,6 +104,8 @@
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
 								</option>
+								<option id="nvcc.compiler.maxregcount.464865780" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
+								<option id="nvcc.compiler.usefastmath.296369860" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
 								<inputType id="nvcc.compiler.input.cu.279360062" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.656687760" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.1446234031" superClass="nvcc.compiler.input.c"/>

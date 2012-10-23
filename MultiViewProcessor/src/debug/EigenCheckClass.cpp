@@ -310,6 +310,28 @@ EigenCheckClass::createRotatedViews(thrust::host_vector<float4>& views, thrust::
 //			data[i] -= 5;
 		}
 
+		/* Test ReProjection */
+		int count = 0;
+		for(int i=0;i<views.size();i++)
+		{
+				float cxf = ((views[i].x*120.f)/(0.2084f*views[i].z))+320;
+				float cyf = ((views[i].y*120.f)/(0.2084f*views[i].z))+240;
+
+				int yi = i / 640;
+				int xi = i - yi * 640;
+
+				int cx = (int)cxf;
+				int cy = (int)cyf;
+				if(cx>=0 && cy>=0)
+				{
+					if((yi != cy || xi != cx))
+						printf("(%d/%d) -> (%d/%d) <= (%f/%f) \n",xi,yi,cx,cy,cxf,cyf);
+
+					count++;
+				}
+		}
+		printf("count: %d \n",count);
+
 //	 Test
 //		char path[50];
 //		host::io::PCDIOController pcdIOCtrl;

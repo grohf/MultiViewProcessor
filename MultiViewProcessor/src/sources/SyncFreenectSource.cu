@@ -56,8 +56,8 @@ namespace device
 //			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
 //				printf("factor: %f ref_pix_size: %f ref_dist: %f \n",factor,constant::ref_pix_size,constant::ref_dist);
 
-			wx = (float) ((cx - 320) * factor);
-			wy = (float) ((cy - 240) * factor);
+			wx = (float) ((cx + 0.5 - 320) * factor);
+			wy = (float) ((cy + 0.5 - 240) * factor);
 
 		}
 
@@ -166,6 +166,33 @@ SyncFreenectSource::loadFrame()
 	checkCudaErrors(cudaDeviceSynchronize());
 
 	/* TEST */
+
+//	thrust::device_ptr<float4> d_xyzi = thrust::device_pointer_cast(loader.xyzi);
+//	thrust::device_vector<float4> dv_xyzi(d_xyzi,d_xyzi+640*480);
+//	thrust::host_vector<float4> h_xyzi = dv_xyzi;
+
+//	printf("dist: %f | ref_pix_size: %f \n",ref_dist,ref_pix_size);
+//
+//	int count = 0;
+//	for(int i=0;i<h_xyzi.size();i++)
+//	{
+//			float cxf = ((h_xyzi[i].x*120.f)/(0.2084f*h_xyzi[i].z))+320;
+//			float cyf = ((h_xyzi[i].y*120.f)/(0.2084f*h_xyzi[i].z))+240;
+//
+//			int yi = i / 640;
+//			int xi = i - yi * 640;
+//
+//			int cx = (int)cxf;
+//			int cy = (int)cyf;
+//			if(cx>=0 && cy>=0)
+//			{
+//				if((yi != cy || xi != cx))
+//					printf("(%d/%d) -> (%d/%d) <= (%f/%f) \n",xi,yi,cx,cy,cxf,cyf);
+//
+//				count++;
+//			}
+//	}
+//	printf("count: %d \n",count);
 
 
 //	char path[50];

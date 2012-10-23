@@ -43,9 +43,9 @@ namespace device
 			dy = 16,
 			WARP_SIZE = 32,
 
-			dbx = 9,
-			dby = 12,
-			dbtid = 24,
+			dbx = 0,
+			dby = 0,
+			dbtid = 0,
 		};
 
 		float4 *coords;
@@ -58,6 +58,7 @@ namespace device
 
 		float *output_errorTable;
 		unsigned int *output_errorListIdx;
+		unsigned int *output_validPointsTable;
 
 		float dist_threshold;
 		float angle_threshold;
@@ -85,9 +86,85 @@ namespace device
 			__shared__ float shm_tm[32*12];
 
 			__shared__ float shm_error_buffer[dx*dy];
+			__shared__ unsigned int shm_valid_points_buffer[dx*dy];
 
+			if(blockIdx.x==0 && blockIdx.y==0 && threadIdx.x==0 && threadIdx.y==0)
+				printf("daaaaaaa!! \n");
 
 			unsigned int tid = threadIdx.y*blockDim.x+threadIdx.x;
+
+//			if(blockIdx.x==dbx && blockIdx.y==dby && tid==0)
+//				printf("dimx: %d dimy: %d \n",blockDim.x,blockDim.y);
+//
+//
+//			shm_error_buffer[tid] = 1.0f;
+//			__syncthreads();
+//
+//			float sum = 0.f;
+//			if(dx*dy>=1024) { if(tid < 512) { 	shm_error_buffer[tid] +=  shm_error_buffer[tid+512];	} 	__syncthreads(); }
+//
+//			if(blockIdx.x==dbx && blockIdx.y==dby && tid==dbtid)
+//			{
+//				printf("errorList inBlock: ");
+//				for(int io=0;io<dx*dy;io++)
+//				{
+//					printf("(%d/%f) | ",io,shm_error_buffer[io]);
+//				}
+//				printf("\n");
+//			}
+//
+//			if(dx*dy>=512) 	{ if(tid < 256) { 	shm_error_buffer[tid] +=  shm_error_buffer[tid+256]; } 	__syncthreads(); }
+//
+//			if(blockIdx.x==dbx && blockIdx.y==dby && tid==dbtid)
+//			{
+//				printf("errorList inBlock: ");
+//				for(int io=0;io<dx*dy;io++)
+//				{
+//					printf("(%d/%f) | ",io,shm_error_buffer[io]);
+//				}
+//				printf("\n");
+//			}
+//
+//
+//			if(dx*dy>=256) 	{ if(tid < 128) { 	shm_error_buffer[tid] += shm_error_buffer[tid+128];
+////														shm_valid_points_buffer[tid] = sum_points = sum_points + shm_valid_points_buffer[tid + 128];
+//											} 	__syncthreads(); }
+//
+//			if(dx*dy>=128) 	{ if(tid < 64) 	{ 	shm_error_buffer[tid] += shm_error_buffer[tid+64];
+////														shm_valid_points_buffer[tid] = sum_points = sum_points + shm_valid_points_buffer[tid + 64];
+//											} 	__syncthreads(); }
+//
+//			if(tid < 32)
+//			{
+//				volatile float *smem = shm_error_buffer;
+//				if(dx*dy>=64) 	{ 	smem[tid] += smem[tid+32];}
+//				if(dx*dy>=32) 	{ 	smem[tid] += smem[tid+16];
+////											smem_points[tid] = sum_points = sum_points + smem_points[tid+16];
+//				}
+//				if(dx*dy>=16) 	{ 	smem[tid] += smem[tid+8];
+////											smem_points[tid] = sum_points = sum_points + smem_points[tid+8];
+//				}
+//				if(dx*dy>=8) 	{ 	smem[tid] += smem[tid+4];
+////											smem_points[tid] = sum_points = sum_points + smem_points[tid+4];
+//				}
+//				if(dx*dy>=4) 	{ 	smem[tid] += smem[tid+2];
+////											smem_points[tid] = sum_points = sum_points + smem_points[tid+2];
+//				}
+//				if(dx*dy>=2) 	{ 	smem[tid] += smem[tid+1];
+////											smem_points[tid] = sum_points = sum_points + smem_points[tid+1];
+//				}
+//
+//				if(tid==0)
+//				{
+//
+//				}
+//
+//				if(blockIdx.x==dbx && blockIdx.y==dby && tid==dbtid)
+//					printf("(%d) block_sum: %f \n",0,shm_error_buffer[0]);
+////							printf("(%d) block_sum: %f block_point_sum: %d \n",i,sum,smem_points[tid]);
+//
+//			}
+
 
 			if(blockIdx.x==0 && blockIdx.y==0 && tid == 0)
 				printf("inkernel! \n");
@@ -127,8 +204,9 @@ namespace device
 				{
 					output_errorListIdx[blockIdx.z*n_rsac+soff+tid] = shm_idx[tid];
 				}
+				__syncthreads();
 
-				for(int t = tid;t<32*12;t+=blockDim.x*blockDim.y)
+				for(int t = tid;t<WARP_SIZE*12;t+=blockDim.x*blockDim.y)
 				{
 					unsigned int wid = t/WARP_SIZE;
 					unsigned int wtid = t - wid*WARP_SIZE;
@@ -141,156 +219,179 @@ namespace device
 				}
 				__syncthreads();
 
-//				if(blockIdx.x==1 && blockIdx.y==2 && threadIdx.x==10 && threadIdx.y == 5)
-//				if(blockIdx.x==10 && blockIdx.y==10 && tid == 10)
+//				if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid)
 //				{
-//					for(int i=0;i<12;i++)
-//					{
-//					 	printf("%f |",shm_tm[i*32+0]);
-//					}
-//					printf("\n");
+//					printf("(%d) transform data loaded! \n",soff);
 //				}
 
-				for(int i=0; (i<32) && (soff+i < shm_length) ;i++)
-//				for(int i=0; i<32 ;i++)
+
+
+				for(int i=0; (i<WARP_SIZE) && (soff+i < shm_length) ;i++)
 				{
-					shm_error_buffer[tid] = 0.f;
+//					__syncthreads();
 
-					if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0) printf("pos: %f %f %f \n",pos.x,pos.y,pos.z);
-					if(pos.z != 0)
+					double error = 0.f;
+					bool validPoint = false;
+
+
+					float3 pos_m,n_m;
+					pos_m.x = shm_tm[0*32+i]*pos.x + shm_tm[1*32+i]*pos.y + shm_tm[2*32+i]*pos.z + shm_tm[9*32+i];
+					pos_m.y = shm_tm[3*32+i]*pos.x + shm_tm[4*32+i]*pos.y + shm_tm[5*32+i]*pos.z + shm_tm[10*32+i];
+					pos_m.z = shm_tm[6*32+i]*pos.x + shm_tm[7*32+i]*pos.y + shm_tm[8*32+i]*pos.z + shm_tm[11*32+i];
+
+					if(pos.z != 0 && pos_m.z != 0 && !isReconstructed(pos.w))
 					{
-
-						float3 pos_m,n_m;
-						pos_m.x = shm_tm[0*32+i]*pos.x + shm_tm[1*32+i]*pos.y + shm_tm[2*32+i]*pos.z + shm_tm[9*32+i];
-						pos_m.y = shm_tm[3*32+i]*pos.x + shm_tm[4*32+i]*pos.y + shm_tm[5*32+i]*pos.z + shm_tm[10*32+i];
-						pos_m.z = shm_tm[6*32+i]*pos.x + shm_tm[7*32+i]*pos.y + shm_tm[8*32+i]*pos.z + shm_tm[11*32+i];
 
 						n_m.x = shm_tm[0*32+i]*normal.x + shm_tm[1*32+i]*normal.y+ shm_tm[2*32+i]*normal.z;
 						n_m.y = shm_tm[3*32+i]*normal.x + shm_tm[4*32+i]*normal.y+ shm_tm[5*32+i]*normal.z;
 						n_m.z = shm_tm[6*32+i]*normal.x + shm_tm[7*32+i]*normal.y+ shm_tm[8*32+i]*normal.z;
 
-//						if(blockIdx.x==10 && blockIdx.y==11 && tid == 0 && i==0)
-//						{
-//							for(int d=0;d<12;d++)
-//								printf("%f | ",shm_tm[d*32+i]);
-//							printf("\n");
-//							printf("pos_m: %f %f %f \n",pos_m.x,pos_m.y,pos_m.z);
-//						}
-						if(pos_m.z == 0 || isReconstructed(pos.w))
-							continue;
 
-						float cxf = ((pos_m.x*120.f)/(0.2048f*pos_m.z))+320+1;
-						float cyf = ((pos_m.y*120.f)/(0.2048f*pos_m.z))+240+1;
+						int cx = (int) (((pos_m.x*120.f)/(0.2084f*pos_m.z))+320);
+						int cy = (int) (((pos_m.y*120.f)/(0.2084f*pos_m.z))+240);
 
-						int cx = cxf;
-						int cy = cyf;
 
-						if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
-							printf("%f %f -> %d %d | %f \n",cxf,cyf,cx,cy,(cxf-cx));
-
-						cx += ((cxf-(float)cx)>=0.5)?1:0;
-						cy += ((cyf-(float)cy)>=0.5)?1:0;
-
-//						if(blockIdx.x==10 && blockIdx.y==11 && tid == 0 && i==0)
-//							printf("%d %d \n",cx,cy);
+	//						if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
+	//							printf("%d %d -> %d %d | %f \n",cx,cy,cx,cy);
+	//
 
 						if(cx>0 && cx<640 && cy>0 && cy<480)
 						{
-
 							float4 pos_d = coords[1*640*480+cy*640+cx];
 							float4 n_d = normals[1*640*480+cy*640+cx];
 
-							if( pos_d.z == 0 || isReconstructed(pos_d.w))
-								continue;
-
-							float3 dv = make_float3(pos_m.x-pos_d.x,pos_m.y-pos_d.y,pos_m.z-pos_d.z);
-							float angle = n_m.x * n_d.x + n_m.y * n_d.y + n_m.z * n_d.z;
-
-//							float length =
-							if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
+							if( pos_d.z != 0 && !isReconstructed(pos_d.w))
 							{
-								printf("pos_m: %f %f %f (%d/%d)\n",pos_m.x,pos_m.y,pos_m.z,sx,sy);
-								printf("pos_d: %f %f %f (%d/%d)\n",pos_d.x,pos_d.y,pos_d.z,cx,cy);
-								printf("dv_length: %f dist_tresh: %f \n",norm(dv),dist_threshold);
-							}
+	//								continue;
 
-							//TODO: Bring angle back
-							if( norm(dv) < dist_threshold)// && (((angle>=0)?angle:-angle) < angle_threshold) )
-							{
-								double error = dv.x*n_d.x + dv.y*n_d.y + dv.z*n_d.z;
-								shm_error_buffer[tid] = error * error;
-								if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
+								float3 dv = make_float3(pos_m.x-pos_d.x,pos_m.y-pos_d.y,pos_m.z-pos_d.z);
+								float angle = n_m.x * n_d.x + n_m.y * n_d.y + n_m.z * n_d.z;
+
+	//							if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
+	//							{
+	//								printf("pos_m: %f %f %f (%d/%d)\n",pos_m.x,pos_m.y,pos_m.z,sx,sy);
+	//								printf("pos_d: %f %f %f (%d/%d)\n",pos_d.x,pos_d.y,pos_d.z,cx,cy);
+	//								printf("dv_length: %f dist_tresh: %f \n",norm(dv),dist_threshold);
+	//							}
+
+	//							shm_error_buffer[tid] = dist_threshold;
+	//							shm_valid_points_buffer[tid] = 1;
+
+								validPoint = true;
+
+								//TODO: Bring angle back
+								if( norm(dv) < dist_threshold)// && (((angle>=0)?angle:-angle) < angle_threshold) )
 								{
-									printf("dv: %f %f %f \n",dv.x,dv.y,dv.z);
-									printf("nd: %f %f %f \n",n_d.x,n_d.y,n_d.z);
-									printf("error: %f error^2: %f \n",error,error*error);
+									error = dv.x*n_d.x + dv.y*n_d.y + dv.z*n_d.z;
+									error *= error;
+									if(error>dist_threshold)
+										error = dist_threshold;
+	//								if(error<dist_threshold)
+	//									shm_error_buffer[tid] = error;
+
+	//								if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
+	//								{
+	//									printf("dv: %f %f %f \n",dv.x,dv.y,dv.z);
+	//									printf("nd: %f %f %f \n",n_d.x,n_d.y,n_d.z);
+	//									printf("error: %f error^2: %f \n",error,error*error);
+	//								}
+	//								shm_error_buffer[tid] = 0;// * error;
 								}
-//								shm_error_buffer[tid] = 0;// * error;
 							}
 						}
-					}
 
+					}
 					__syncthreads();
 
-					if(blockIdx.x==dbx && blockIdx.y==dby && i==0 && tid==dbtid)
-					{
-						printf("errorList inBlock: ");
-						for(int io=0;io<dx*dy;io++)
-						{
-							if(shm_error_buffer[io]>1.f)printf("(%d/%f) | ",io,shm_error_buffer[io]);
-						}
-						printf("\n");
-					}
+					shm_error_buffer[tid] = error;
+					shm_valid_points_buffer[tid] = validPoint;
+					__syncthreads();
 
-					float sum = 0.f;
-					if(dx*dy>=1024) { if(tid < 512) { shm_error_buffer[tid] = sum = sum + shm_error_buffer[tid+512];} __syncthreads(); }
-					if(dx*dy>=512) 	{ if(tid < 256) { shm_error_buffer[tid] = sum = sum + shm_error_buffer[tid+256];} __syncthreads(); }
-					if(dx*dy>=256) 	{ if(tid < 128) { shm_error_buffer[tid] = sum = sum + shm_error_buffer[tid+128];} __syncthreads(); }
-					if(dx*dy>=128) 	{ if(tid < 64) 	{ shm_error_buffer[tid] = sum = sum + shm_error_buffer[tid+64];	} __syncthreads(); }
+//					if(blockIdx.x==dbx && blockIdx.y==dby && i==0 && tid==dbtid)
+//					{
+//						printf("errorList inBlock: ");
+//						for(int io=0;io<dx*dy;io++)
+//						{
+//							printf("(%d/%f) | ",io,shm_error_buffer[io]);
+//						}
+//						printf("\n");
+//					}
+
+//					if(blockIdx.x==dbx && blockIdx.y==dby && i==0 && tid==dbtid)
+//					{
+//						printf("validPoints inBlock: ");
+//						for(int io=0;io<dx*dy;io++)
+//						{
+//							printf("(%d/%d) | ",io,shm_valid_points_buffer[io]);
+//						}
+//						printf("\n");
+//					}
+
+					__syncthreads();
+//					float sum = 0.f;
+//					unsigned int sum_points = 0;
+					if(dx*dy>=1024) { if(tid < 512) { 	shm_error_buffer[tid] += shm_error_buffer[tid+512];
+														shm_valid_points_buffer[tid] += shm_valid_points_buffer[tid + 512];
+													} 	__syncthreads(); }
+
+					if(dx*dy>=512) 	{ if(tid < 256) { 	shm_error_buffer[tid] += shm_error_buffer[tid+256];
+														shm_valid_points_buffer[tid] += shm_valid_points_buffer[tid + 256];
+													} 	__syncthreads(); }
+
+					if(dx*dy>=256) 	{ if(tid < 128) { 	shm_error_buffer[tid] += shm_error_buffer[tid+128];
+														shm_valid_points_buffer[tid] += shm_valid_points_buffer[tid + 128];
+													} 	__syncthreads(); }
+
+					if(dx*dy>=128) 	{ if(tid < 64) 	{ 	shm_error_buffer[tid] += shm_error_buffer[tid+64];
+														shm_valid_points_buffer[tid] += shm_valid_points_buffer[tid + 64];
+													} 	__syncthreads(); }
+
+
 					if(tid < 32)
 					{
 						volatile float *smem = shm_error_buffer;
-						if(dx*dy>=64) 	{ smem[tid] = sum = sum + smem[tid+32]; }
-						if(dx*dy>=32) 	{ smem[tid] = sum = sum + smem[tid+16]; }
-						if(dx*dy>=16) 	{ smem[tid] = sum = sum + smem[tid+8]; 	}
-						if(dx*dy>=8) 	{ smem[tid] = sum = sum + smem[tid+4]; 	}
-						if(dx*dy>=4) 	{ smem[tid] = sum = sum + smem[tid+2]; 	}
-						if(dx*dy>=2) 	{ smem[tid] = sum = sum + smem[tid+1]; 	}
+						volatile unsigned int *smem_points = shm_valid_points_buffer;
+						if(dx*dy>=64) 	{ 	smem[tid] += smem[tid+32];
+											smem_points[tid] +=smem_points[tid+32];
+						}
+						if(dx*dy>=32) 	{ 	smem[tid] += smem[tid+16];
+											smem_points[tid] += smem_points[tid+16];
+						}
+						if(dx*dy>=16) 	{ 	smem[tid] += smem[tid+8];
+											smem_points[tid] += smem_points[tid+8];
+						}
+						if(dx*dy>=8) 	{ 	smem[tid] += smem[tid+4];
+											smem_points[tid] +=smem_points[tid+4];
+						}
+						if(dx*dy>=4) 	{ 	smem[tid] += smem[tid+2];
+											smem_points[tid] += smem_points[tid+2];
+						}
+						if(dx*dy>=2) 	{ 	smem[tid] += smem[tid+1];
+											smem_points[tid] += smem_points[tid+1];
+						}
 
 						if(tid==0)
 						{
-							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = sum;
-
-							if(blockIdx.x==dbx && blockIdx.y==dby && i==0)
-								printf("(%d) block_sum: %f \n",i,sum);
+							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = shm_error_buffer[0];
+							output_validPointsTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = shm_valid_points_buffer[0];
 
 //							output_errorList[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = blockIdx.y*gridDim.x+blockIdx.x;
 //							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = i/(gridDim.x*gridDim.y);
 //							output_errorList[(i)*gridDim.y*gridDim.x+blockIdx.y*gridDim.x+blockIdx.x] = smem[0];
 //							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = soff + i;
 						}
+
+//						if(blockIdx.x==dbx && blockIdx.y==dby && i==0 && tid==dbtid)
+//							printf("(%d) block_sum: %f block_point_sum: %d \n",i,shm_error_buffer[0],shm_valid_points_buffer[0]);
+
 					}
+					__syncthreads();
 
 				}
 
 				__syncthreads();
 
-
-//				if(blockIdx.x==0 && blockIdx.y==0 && threadIdx.x==0 && threadIdx.y == 0)
-//					shm_off++;
-//
-//				__syncthreads();
-
-
 			}
-
-
-
-//			float4 local_pos = pos[]
-
-//			if(blockIdx.x==0 && blockIdx.y==0 && threadIdx.x==0 && threadIdx.y==0)
-//				printf("%d \n",transformationMetaData[0]);
-
 
 		}
 
@@ -307,9 +408,12 @@ namespace device
 		};
 
 		float *input_errorTable;
+		unsigned int *input_validPoints;
 
 		float *output_errorList;
 		int *listMetaData;
+
+		unsigned int min_overlap;
 
 		unsigned int gxy;
 		unsigned int n_rsac;
@@ -317,7 +421,8 @@ namespace device
 	    __device__ __forceinline__ void
 		operator () () const
 		{
-	    	__shared__ float shm[dx];
+	    	__shared__ float shm_error[dx];
+	    	__shared__ unsigned int shm_points[dx];
 	    	__shared__ unsigned int shm_length;
 
 
@@ -338,36 +443,72 @@ namespace device
 	    	}
 
 	    	float sum = 0.f;
+	    	unsigned int sum_points = 0;
 	    	while(i<gxy)
 	    	{
 	    		sum += input_errorTable[(blockIdx.y*n_rsac+blockIdx.x)*gxy+i];
+	    		sum_points += input_validPoints[(blockIdx.y*n_rsac+blockIdx.x)*gxy+i];
+
 	    		if( (i+dx) < gxy )
+	    		{
 	    			sum += input_errorTable[(blockIdx.y*n_rsac+blockIdx.x)*gxy+i+dx];
+	    			sum_points += input_validPoints[(blockIdx.y*n_rsac+blockIdx.x)*gxy+i+dx];
+	    		}
 
 	    		i += dx*2;
 	    	}
 
-	    	shm[tid] = sum;
+	    	shm_error[tid] = sum;
+	    	shm_points[tid] = sum_points;
 	    	__syncthreads();
 
 
-	    	if(dx>=1024){ if(tid<512) 	{shm[tid] = sum = sum + shm[tid + 512];	} __syncthreads(); }
-	    	if(dx>=512)	{ if(tid<256) 	{shm[tid] = sum = sum + shm[tid + 256];	} __syncthreads(); }
-	    	if(dx>=256)	{ if(tid<128) 	{shm[tid] = sum = sum + shm[tid + 128];	} __syncthreads(); }
-	    	if(dx>=128)	{ if(tid<64) 	{shm[tid] = sum = sum + shm[tid + 64];	} __syncthreads(); }
+	    	if(dx>=1024){ if(tid<512) 	{	shm_error[tid] = sum = sum + shm_error[tid + 512];
+	    									shm_points[tid] = sum_points = sum_points + shm_points[tid + 512];
+										} 	__syncthreads(); }
+
+	    	if(dx>=512)	{ if(tid<256) 	{	shm_error[tid] = sum = sum + shm_error[tid + 256];
+											shm_points[tid] = sum_points = sum_points + shm_points[tid + 256];
+										} 	__syncthreads(); }
+
+	    	if(dx>=256)	{ if(tid<128) 	{	shm_error[tid] = sum = sum + shm_error[tid + 128];
+											shm_points[tid] = sum_points = sum_points + shm_points[tid + 128];
+										} 	__syncthreads(); }
+
+	    	if(dx>=128)	{ if(tid<64) 	{	shm_error[tid] = sum = sum + shm_error[tid + 64];
+											shm_points[tid] = sum_points = sum_points + shm_points[tid + 64];
+										} 	__syncthreads(); }
 
 	    	if(tid<32)
 	    	{
-	    		volatile float *smem = shm;
-	    		if(dx>=64) 	{ smem[tid] = sum = sum + smem[tid + 32]; 	}
-	    		if(dx>=32) 	{ smem[tid] = sum = sum + smem[tid + 16]; 	}
-	    		if(dx>=16) 	{ smem[tid] = sum = sum + smem[tid + 8];	}
-	    		if(dx>=8) 	{ smem[tid] = sum = sum + smem[tid + 4]; 	}
-	    		if(dx>=4)	{ smem[tid] = sum = sum + smem[tid + 2]; 	}
-	    		if(dx>=2) 	{ smem[tid] = sum = sum + smem[tid + 1]; 	}
+	    		volatile float *smem = shm_error;
+	    		volatile unsigned int *smem_points = shm_points;
+
+	    		if(dx>=64) 	{ 	smem[tid] = sum = sum + smem[tid + 32];
+	    						smem_points[tid] = sum_points = sum_points + smem_points[tid + 32]; }
+
+	    		if(dx>=32) 	{ 	smem[tid] = sum = sum + smem[tid + 16];
+								smem_points[tid] = sum_points = sum_points + smem_points[tid + 16]; }
+
+	    		if(dx>=16) 	{ 	smem[tid] = sum = sum + smem[tid + 8];
+								smem_points[tid] = sum_points = sum_points + smem_points[tid + 8]; }
+
+	    		if(dx>=8) 	{ 	smem[tid] = sum = sum + smem[tid + 4];
+								smem_points[tid] = sum_points = sum_points + smem_points[tid + 4]; }
+
+	    		if(dx>=4)	{ 	smem[tid] = sum = sum + smem[tid + 2];
+								smem_points[tid] = sum_points = sum_points + smem_points[tid + 2]; }
+
+	    		if(dx>=2) 	{ 	smem[tid] = sum = sum + smem[tid + 1];
+								smem_points[tid] = sum_points = sum_points + smem_points[tid + 1]; }
 
 	    		if(tid==0)
-	    			output_errorList[(blockIdx.y*n_rsac)+blockIdx.x] = (sum>0.f)? sum : numeric_limits<float>::max();
+	    		{
+	    			output_errorList[(blockIdx.y*n_rsac)+blockIdx.x] = (sum>0.f && sum_points >= min_overlap)? sum/sum_points : numeric_limits<float>::max();
+	    		}
+
+	    		if(blockIdx.x == 10 && tid == 0)
+	    			printf("sum_error: %f | sum_validPoints: %d \n",sum,sum_points);
 	    	}
 
 
@@ -514,17 +655,20 @@ TranformationValidator::init()
 	transformationErrorestimator.transformationMetaData = (int *)getInputDataPointer(TransformationInfoList);
 
 	transformationErrorestimator.output_errorTable = (float *)getTargetDataPointer(ErrorTable);
+	transformationErrorestimator.output_validPointsTable = (unsigned int *)getTargetDataPointer(ValidPointsTable);
 	transformationErrorestimator.output_errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
 	transformationErrorestimator.n_rsac = n_rsac;
-	transformationErrorestimator.dist_threshold = 300;
-	transformationErrorestimator.angle_threshold = 0.5f;
+	transformationErrorestimator.dist_threshold = 50;
+	transformationErrorestimator.angle_threshold = 0.0f;
 
 
 	errorListSumcalculator256.input_errorTable = (float *)getTargetDataPointer(ErrorTable);
+	errorListSumcalculator256.input_validPoints = (unsigned int *)getTargetDataPointer(ValidPointsTable);
 	errorListSumcalculator256.output_errorList = (float *)getTargetDataPointer(ErrorList);
 	errorListSumcalculator256.listMetaData = (int *)getInputDataPointer(TransformationInfoList);
 	errorListSumcalculator256.gxy = grid.x * grid.y;
 	errorListSumcalculator256.n_rsac = n_rsac;
+	errorListSumcalculator256.min_overlap = (640*480)/20;
 
 
 	errorListMinimumPicker256.errorList = (float *)getTargetDataPointer(ErrorList);
@@ -564,6 +708,7 @@ void TranformationValidator::execute()
 //		}
 //		printf("\n");
 //	}
+
 
 	device::computeErrorListSum<<<n_rsac,errorListSumcalculator256.dx>>>(errorListSumcalculator256);
 	checkCudaErrors(cudaGetLastError());
@@ -627,6 +772,13 @@ TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int
 	errorTableParams.elementType = FLOAT1;
 	errorTableParams.dataType = Point;
 	addTargetData(addDeviceDataRequest(errorTableParams),ErrorTable);
+
+	DeviceDataParams validPointsTableParams;
+	validPointsTableParams.elements = ((n_views-1)*n_views)/2 * n_rsac * grid.x * grid.y;
+	validPointsTableParams.element_size = sizeof(unsigned int);
+	validPointsTableParams.elementType = UINT1;
+	validPointsTableParams.dataType = Point;
+	addTargetData(addDeviceDataRequest(validPointsTableParams),ValidPointsTable);
 
 //	printf("elements: %d \gxy",errorListParams.elements);
 
@@ -823,6 +975,9 @@ TranformationValidator::TestTransform()
 	*/
 }
 
+
+
+
 void
 TranformationValidator::TestTransformError(thrust::host_vector<float4> v0,thrust::host_vector<float4> v1, thrust::host_vector<float4> n0, thrust::host_vector<float4> n1, thrust::host_vector<float> transform)
 {
@@ -836,6 +991,7 @@ TranformationValidator::TestTransformError(thrust::host_vector<float4> v0,thrust
 		h_normals[i] = n1[i];
 		h_normals[v0.size()+i] = n0[i];
 	}
+
 
 	thrust::device_vector<float4> d_coords = h_views;
 	thrust::device_vector<float4> d_normals = h_normals;
@@ -865,13 +1021,16 @@ TranformationValidator::TestTransformError(thrust::host_vector<float4> v0,thrust
 	transformationErrorestimator.transformationMetaData = thrust::raw_pointer_cast(d_metaData.data());
 
 	thrust::device_vector<float> d_errorTable(n_rsac*grid.x*grid.y);
+	thrust::device_vector<unsigned int> d_validPointsTable(n_rsac*grid.x*grid.y);
 	thrust::device_vector<unsigned int> d_errorListIdx(n_rsac);
 	transformationErrorestimator.output_errorTable = thrust::raw_pointer_cast(d_errorTable.data());
+	transformationErrorestimator.output_validPointsTable = thrust::raw_pointer_cast(d_validPointsTable.data());
 	transformationErrorestimator.output_errorListIdx = thrust::raw_pointer_cast(d_errorListIdx.data());
+
 
 	transformationErrorestimator.n_rsac = n_rsac;
 	transformationErrorestimator.dist_threshold = 50;
-	transformationErrorestimator.angle_threshold = 0.5f;
+	transformationErrorestimator.angle_threshold = 0.0f;
 
 
 	device::computeTransformationError<<<grid,block>>>(transformationErrorestimator);
@@ -880,12 +1039,18 @@ TranformationValidator::TestTransformError(thrust::host_vector<float4> v0,thrust
 
 
 	thrust::host_vector<float> h_errorTable = d_errorTable;
+	thrust::host_vector<unsigned int> h_validPoints = d_validPointsTable;
 	printf("errortable: ");
+	unsigned int validPointsSum = 0;
+	float errorSum = 0.f;
 	for(int i=0;i<grid.x*grid.y;i++)
 	{
-		printf("(%d/%f) | ",i,h_errorTable[i]);
+		printf("(%d/%f/%d) | ",i,h_errorTable[i],h_validPoints[i]);
+		validPointsSum += h_validPoints[i];
+		errorSum += h_errorTable[i];
 	}
 	printf(" \n");
+	printf("errorSum: %f | validPointSum: %d | normailzed: %f \n",errorSum,validPointsSum,errorSum/validPointsSum);
 
 //	thrust::device_vector<float> d_errorTable = h_errorTable;
 	thrust::device_vector<float> d_errorList(n_rsac);
@@ -893,9 +1058,11 @@ TranformationValidator::TestTransformError(thrust::host_vector<float4> v0,thrust
 
 
 	errorListSumcalculator256.input_errorTable = thrust::raw_pointer_cast(d_errorTable.data());
+	errorListSumcalculator256.input_validPoints = thrust::raw_pointer_cast(d_validPointsTable.data());
 	errorListSumcalculator256.output_errorList = thrust::raw_pointer_cast(d_errorList.data());
 	errorListSumcalculator256.listMetaData = thrust::raw_pointer_cast(d_metaData.data());
 
+	errorListSumcalculator256.min_overlap = (640*480)/10;
 	errorListSumcalculator256.gxy = grid.x * grid.y;
 	errorListSumcalculator256.n_rsac = n_rsac;
 

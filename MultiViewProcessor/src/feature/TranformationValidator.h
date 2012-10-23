@@ -27,6 +27,7 @@ class TranformationValidator : public Feature {
 	{
 		MinimumErrorTransformationMatrices,
 		ErrorTable,
+		ValidPointsTable,
 		ErrorList,
 		ErrorListIndices,
 	};
@@ -100,7 +101,6 @@ public:
 	void TestTransform();
 
 	void TestTransformError(thrust::host_vector<float4> v0,thrust::host_vector<float4> v1, thrust::host_vector<float4> n0, thrust::host_vector<float4> n1, thrust::host_vector<float> transform);
-
 };
 
 #endif /* TRANFORMATIONVALIDATOR_H_ */
