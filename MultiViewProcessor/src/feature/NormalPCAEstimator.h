@@ -15,6 +15,7 @@ class NormalPCAEstimator : public Feature {
 
 	dim3 grid;
 	dim3 block;
+	float dist_thresh;
 
 	unsigned int n_view;
 
@@ -30,7 +31,7 @@ class NormalPCAEstimator : public Feature {
 
 public:
 
-	NormalPCAEstimator(unsigned int n_view_);
+	NormalPCAEstimator(unsigned int n_view_,float dist_thresh_);
 	virtual ~NormalPCAEstimator();
 
 	void execute();

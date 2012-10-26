@@ -377,15 +377,15 @@ void ATrousFilter::execute()
 //	 Test
 //		char path[50];
 
-//		for(int i=0;i<n_view;i++)
-//		{
-//			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-//			checkCudaErrors(cudaMemcpy(h_f4_depth,coordsUpdater.pos+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-//
-//			sprintf(path,"/home/avo/pcds/src_wc_points_atfiltered_%d.pcd",i);
-//			host::io::PCDIOController pcdIOCtrl;
-//			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
-//		}
+		for(int i=0;i<n_view;i++)
+		{
+			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+			checkCudaErrors(cudaMemcpy(h_f4_depth,coordsUpdater.pos+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+			sprintf(path,"/home/avo/pcds/src_wc_points_atfiltered_%d.pcd",i);
+			host::io::PCDIOController pcdIOCtrl;
+			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+		}
 
 
 }

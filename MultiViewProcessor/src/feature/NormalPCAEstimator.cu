@@ -21,6 +21,8 @@ namespace device
 		float4 *input;
 		float4 *output;
 
+		float dist_thresh;
+
 		enum
 		{
 			kxr = 9,
@@ -100,7 +102,7 @@ namespace device
 				{
 					off = (threadIdx.y+sy)*kx+threadIdx.x+sx;
 
-					if(sqrtf( (mid.x-shm[off].x)*(mid.x-shm[off].x)+(mid.y-shm[off].y)*(mid.y-shm[off].y)+(mid.z-shm[off].z)*(mid.z-shm[off].z) ) < 20)
+					if(sqrtf( (mid.x-shm[off].x)*(mid.x-shm[off].x)+(mid.y-shm[off].y)*(mid.y-shm[off].y)+(mid.z-shm[off].z)*(mid.z-shm[off].z) ) < dist_thresh)
 					{
 						mean.x += shm[off].x;
 						mean.y += shm[off].y;
@@ -232,7 +234,7 @@ namespace device
 			  output[blockIdx.z*640*480+sy*640+sx] = make_float4(0,0,0,-4);
 			  return;
 		  }
-		  if( dot(n,mid) >= 0.0f)
+		  if( dot(n,mid) > 0.0f)
 		  {
 //		    	  n = make_float3(0,0,0);
 //		    	  float4 f4 = make_float4(0,0,0,1);
@@ -246,8 +248,9 @@ namespace device
 		  }
 
 		  float eig_sum = evals.x + evals.y + evals.z;
-		  float curvature = (eig_sum == 0) ? 0 : fabsf( evals.x / eig_sum );
+		  float curvature = (eig_sum == 0) ? -1 : fabsf( evals.x / eig_sum );
 		  float4 f4 = make_float4(n.x,n.y,n.z,curvature);
+//		  float4 f4 = make_float4(evals.x,evals.y,evals.z,curvature);
 
 //		      surf3Dwrite<float4>(f4,surf::surfRefBuffer,sx*sizeof(float4),sy,blockIdx.z);
 		  output[blockIdx.z*640*480+sy*640+sx] = f4;
@@ -272,6 +275,7 @@ NormalPCAEstimator::init()
 
 	normalEstimator.input = (float4 *)getInputDataPointer(WorldCoordinates);
 	normalEstimator.output = (float4 *)getTargetDataPointer(Normals);
+	normalEstimator.dist_thresh = 500;
 
 }
 
@@ -313,15 +317,38 @@ NormalPCAEstimator::execute()
 
 		sprintf(path,"/home/avo/pcds/normals_pca_%d.ppm",v);
 		sdkSavePPM4ub(path,(unsigned char *)h_uc4,640,480);
+
+		uchar4 *h_curv = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		for(int i=0;i<640*480;i++)
+		{
+			if(h_f4_normals[i].w >= 0.0f && h_f4_normals[i].w < 0.03f)
+			{
+				h_curv[i].x = 255;
+				h_curv[i].y = 0;
+				h_curv[i].z = 0;
+				h_curv[i].w = 127.f;
+			}
+			else
+			{
+					h_curv[i].x = 0;
+					h_curv[i].y = 0;
+					h_curv[i].z = 0;
+					h_curv[i].w = 127.f;
+			}
+
+		}
+
+		sprintf(path,"/home/avo/pcds/curv_pca_%d.ppm",v);
+		sdkSavePPM4ub(path,(unsigned char *)h_curv,640,480);
 	}
 
 //	char path[50];
-//	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
-//	checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-//
-//	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",2);
-//	host::io::PCDIOController ioCtrl;
-//	ioCtrl.writeASCIIPCDNormals(path,(float *)h_f4_normals,640*480);
+	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
+	checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",2);
+	host::io::PCDIOController ioCtrl;
+	ioCtrl.writeASCIIPCDNormals(path,(float *)h_f4_normals,640*480);
 //
 //	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
 //	checkCudaErrors(cudaMemcpy(h_f4_depth,normalEstimator.input,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
@@ -333,9 +360,10 @@ NormalPCAEstimator::execute()
 	printf("normals done \n");
 }
 
-NormalPCAEstimator::NormalPCAEstimator(unsigned int n_view_)
+NormalPCAEstimator::NormalPCAEstimator(unsigned int n_view_,float distThresh_)
 {
 	n_view = n_view_;
+	dist_thresh = distThresh_;
 
 	DeviceDataParams params;
 	params.elements = 640*480*n_view;

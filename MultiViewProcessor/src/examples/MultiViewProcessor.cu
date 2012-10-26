@@ -26,6 +26,7 @@
 #include <thrust/host_vector.h>
 
 #include "../sources/SyncFreenectSource.h"
+#include "../sources/SynthRGBDBenchmarkSource.h"
 #include "../filter/TestFilter.h"
 #include "../filter/TestFilter2.h"
 #include "../filter/ATrousFilter.h"
@@ -58,7 +59,7 @@ void runTestProcessor()
 
 	p.addFilter(FilterPtr(atrousfilter));
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1,20);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 //	nPCAestimator->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
 	p.addFeature(nPCAestimator);
@@ -93,17 +94,17 @@ void runMultiViewTest()
 	Processor p;
 	p.setSource(SourcePtr(src));
 
-	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,3000.f);
+	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
 	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
 	p.addFilter(FilterPtr(truncateThresholdFilter));
 
-	ATrousFilter *atrousfilter = new ATrousFilter(2,2,10,5,2);
+	ATrousFilter *atrousfilter = new ATrousFilter(2,3,10,5,2);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
 	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
 	p.addFilter(FilterPtr(atrousfilter));
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2,50);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
@@ -113,22 +114,22 @@ void runMultiViewTest()
 	fpfhEstimator->setNormals(nPCAestimator->getNormals());
 	p.addFeature(fpfhEstimator);
 
-	unsigned int r_ransac = 4096;
-
-	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,64,32);
-	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
-	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
-	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
-	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
-	p.addFeature(rbEstimator);
-
-	TranformationValidator *validator = new TranformationValidator(2,r_ransac);
-	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
-	validator->setNormals(nPCAestimator->getNormals());
-	validator->setSensorInfoList(src->getTargetData(SyncFreenectSource::SensorInfoList));
-	validator->setTransformationmatrices(rbEstimator->getTransformationMatrices());
-	validator->setTranformationInfoList(rbEstimator->getTransformationInfoList());
-	p.addFeature(validator);
+//	unsigned int r_ransac = 4096;
+//
+//	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,64,32);
+//	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
+//	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
+//	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
+//	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+//	p.addFeature(rbEstimator);
+//
+//	TranformationValidator *validator = new TranformationValidator(2,r_ransac);
+//	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+//	validator->setNormals(nPCAestimator->getNormals());
+//	validator->setSensorInfoList(src->getTargetData(SyncFreenectSource::SensorInfoList));
+//	validator->setTransformationmatrices(rbEstimator->getTransformationMatrices());
+//	validator->setTranformationInfoList(rbEstimator->getTransformationInfoList());
+//	p.addFeature(validator);
 
 	p.start();
 
@@ -194,7 +195,7 @@ void TestTransformationerror()
 	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
 	p.addFilter(FilterPtr(atrousfilter));
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1,20);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
@@ -239,6 +240,15 @@ void TestTransformationerror()
 	src->~SyncFreenectSource();
 }
 
+void TestSynthInput()
+{
+	Processor p;
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(1);
+	p.setSource(SourcePtr(src));
+
+	p.start();
+
+}
 
 void PointInfoTest()
 {
@@ -262,7 +272,7 @@ void PointInfoTest()
 	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(FilterPtr(truncateThresholdFilter));
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2,20);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
@@ -294,20 +304,42 @@ void PointInfoTest()
 	src->~SyncFreenectSource();
 }
 
-/**
- * Host function that prepares data array and passes it to the CUDA kernel.
- */
+void runNormalTest()
+{
+	Processor p;
+
+	SyncFreenectSource *src = new SyncFreenectSource(1);
+	p.setSource(SourcePtr(src));
+
+
+	ATrousFilter *atrousfilter = new ATrousFilter(1,3,15,3,2);
+	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
+	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
+	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
+	p.addFilter(FilterPtr(atrousfilter));
+
+
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(1,50);
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(nPCAestimator);
+
+	p.start();
+	src->~SyncFreenectSource();
+}
+
 int main(int argc, char **argv) {
 
 //	runTestProcessor();
+//	runNormalTest();
 
 //	TesterFct();
 //	TestTransformationerror();
+	TestSynthInput();
 //	PointInfoTest();
 
 
 
 
-	runMultiViewTest();
+//	runMultiViewTest();
 	return 0;
 }
