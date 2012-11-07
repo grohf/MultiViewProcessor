@@ -64,6 +64,7 @@ namespace device
 //			unsigned int oy = (blockIdx.x * points_per_block + wid)/640;
 //			unsigned int ox = (blockIdx.x * points_per_block + wid) - oy*640;
 
+			unsigned int ox,oy;
 			if(tid<points_per_block)
 			{
 				shm_off[tid] = (blockIdx.x * points_per_block + tid)/640;
@@ -75,7 +76,8 @@ namespace device
 
 			for(int j=wtid;j<rxl*ryl;j+=WARP_SIZE)
 			{
-
+				oy = j/ryl;
+				ox = j - oy*ryl;
 			}
 
 
