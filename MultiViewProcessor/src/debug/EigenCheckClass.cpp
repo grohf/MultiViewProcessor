@@ -6,8 +6,12 @@
  */
 
 #include <Eigen/Dense>
-#include <stdio.h>
+
 #include <iostream>
+#include <fstream>
+#include <cstring>
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -373,4 +377,257 @@ EigenCheckClass::createRotatedViews(thrust::host_vector<float4>& views, thrust::
 
 
 //		freenect_sync_stop();
+}
+
+const int MAX_CHARS_PER_LINE = 512;
+const int MAX_TOKENS_PER_LINE = 20;
+const char* const DELIMITER = " ";
+
+void
+EigenCheckClass::createRefrenceTransformationMatrices(char *dirPath, unsigned int n_views, unsigned int *lns_depth, char **path_depth,  char **path_rgb, float *tansformationMatrices)
+{
+
+	std::ifstream fin_gt,fin_depth,fin_rgb;
+	fin_gt.open("/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/groundtruth.txt");
+	fin_depth.open("/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/depth.txt");
+	fin_rgb.open("/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/rgb.txt");
+	if (!fin_gt.good() || !fin_depth.good() || !fin_rgb.good())
+	{
+		printf("file not found \n");
+		return;
+	}
+
+	//get min_sensor_ts
+	double min_sensor_ts;
+
+	char *oldSensorLineBuffer;
+	bool cond = true;
+	while (!fin_gt.eof() && cond)
+	{
+		char buf[MAX_CHARS_PER_LINE];
+		fin_gt.getline(buf,MAX_CHARS_PER_LINE);
+
+		const char* token[MAX_TOKENS_PER_LINE] = {0};
+		token[0] = strtok(buf, DELIMITER);
+		if(strcmp(token[0],"#"))
+		{
+			min_sensor_ts = atof(token[0]);
+			printf("min_sensor_ts: %f \n",min_sensor_ts);
+			oldSensorLineBuffer = buf;
+			cond = false;
+
+//			for (int n = 1; n < MAX_TOKENS_PER_LINE; n++)
+//			{
+//				token[n] = strtok(0, DELIMITER);
+//				if (!token[n]) break;
+//
+//				double t = atof(token[n]);
+//				printf("%f \n",t);
+//			}
+		}
+	}
+
+	cond = true;
+	int l = 0;
+
+	unsigned int linecount = 0;
+//	char *depth_png;
+//	double depth_ts;
+//	path_depth = (char **)malloc(n_views*sizeof(char *));
+
+	char depth_path_tmp[n_views][50];
+	double depth_ts[n_views];
+
+	while (!fin_depth.eof() && cond)
+	{
+		char buf[MAX_CHARS_PER_LINE];
+		fin_depth.getline(buf,MAX_CHARS_PER_LINE);
+
+		const char* token[MAX_TOKENS_PER_LINE] = {0};
+		token[0] = strtok(buf, DELIMITER);
+//		printf("%s! > %d \n",token[0],strcmp(token[0],"#"));
+
+		if(strcmp(token[0],"#") && (atof(token[0]) > min_sensor_ts))
+		{
+			if(linecount==lns_depth[l])
+			{
+				depth_ts[l] = atof(token[0]);
+				char tmp_char[50];
+//				depth_path_tmp[l] = strtok(0, DELIMITER);
+
+				strcpy(depth_path_tmp[l],strtok(0, DELIMITER));
+
+				printf("%d: %s -> %f \n",l,depth_path_tmp[l],depth_ts[l]);
+
+				if(++l==n_views)
+					cond = false;
+			}
+
+			linecount++;
+		}
+	}
+
+
+//	path_depth = (char **)&depth_path_tmp;
+
+	for(int i=0;i<n_views;i++)
+	{
+		printf("%d: %s -> %f \n",i,depth_path_tmp[i],depth_ts[i]);
+	}
+
+//	printf("%f > %s \n",depth_ts,depth_png);
+
+
+
+//	int c = 0;
+//	while (!fin_gt.eof() && (c++ < 20) )
+//	{
+//		char buf[512];
+//		fin_gt.getline(buf,512);
+//		int n = 0;
+//
+//		const char* token[MAX_TOKENS_PER_LINE] = {0};
+//
+//		token[0] = strtok(buf, DELIMITER);
+//		if (token[0])
+//		{
+//		  for (n = 1; n < MAX_TOKENS_PER_LINE; n++)
+//		  {
+//			token[n] = strtok(0, DELIMITER);
+//			if (!token[n]) break;
+//		  }
+//		}
+//
+//		// process (print) the tokens
+//		for (int i = 0; i < n; i++) // n = #of tokens
+//		  std::cout << "Token[" << i << "] = " << token[i] << std::endl;
+//		std::cout << std::endl;
+//	}
+
+
+	/*
+	Eigen::Quaternion<float> q1(0.7889,-0.5183,0.1970,-0.2651);
+	Eigen::Quaternion<float> q2 = q1.inverse();
+
+	printf("quads: %f %f %f %f \n",q1.x(),q1.y(),q1.z(),q1.w());
+	printf("quads2: %f %f %f %f \n",q2.x(),q2.y(),q2.z(),q2.w());
+
+	Eigen::Quaternion<float> q3 = q2*q1;
+	 */
+
+
+//	std::cout << "q1 :\n" << q1.matrix() << std::endl;
+//	std::cout << "q1.inv :\n" << q1.matrix().inverse() << std::endl;
+//	std::cout << "q2 :\n" << q2.matrix() << std::endl;
+//	std::cout << "q3 :\n" << q3.matrix() << std::endl;
+//
+//
+////	std::cout << "Here is the quad :\n" << q.toRotationMatrix() << std::endl;
+//	std::cout << "Here is the q3.det :\n" << q3.matrix().determinant() << std::endl;
+
+
+}
+
+void
+EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::host_vector<float>& in_quaternions,thrust::host_vector<float>& tranformmatrices,bool anchorFist)
+{
+	Eigen::Matrix3f reRota;
+	Eigen::Vector3f reTrans;
+//	Eigen::Matrix4f reTransform = Eigen::Matrix4f::Identity();
+	for(int v=0;v<n_view;v++)
+	{
+		printf("%d: ",v);
+		for(int tq=0;tq<7;tq++)
+		{
+			printf("%f |",in_quaternions[v*7+tq]);
+		}
+		printf("\n");
+
+
+		Eigen::Quaternion<float> q(in_quaternions[v*7+6],in_quaternions[v*7+3],in_quaternions[v*7+4],in_quaternions[v*7+5]);
+//		std::cout << "q1 :\n" << q1.matrix() << std::endl;
+//		std::cout << "q1_inv :\n" << q1.inverse().matrix() << std::endl;
+
+		Eigen::Matrix3f rota = q.matrix();
+		Eigen::Vector3f v_out;
+		v_out << in_quaternions[v*7+0],in_quaternions[v*7+1],in_quaternions[v*7+2];
+		if(anchorFist)
+		{
+			if(v==0)
+			{
+				reRota = rota.inverse();
+				reTrans = -(reRota * v_out);
+			}
+
+			rota = reRota * rota;
+			v_out = reRota * v_out + reTrans;
+
+		}
+
+		Eigen::Matrix3f r_out = rota.inverse();
+		std::cout << "r_out :\n" << r_out << std::endl;
+		std::cout << "v_out :\n" << v_out << std::endl;
+
+		for(int t=0;t<9;t++)
+		{
+			tranformmatrices[v*12+t] = (r_out.data())[t];
+		}
+		tranformmatrices[v*12+9] 	= v_out[0];
+		tranformmatrices[v*12+10] 	= v_out[1];
+		tranformmatrices[v*12+11] 	= v_out[2];
+	}
+
+}
+
+void
+EigenCheckClass::checkCorrelationQuality(thrust::host_vector<float4> points_view1,thrust::host_vector<float4> points_view2,thrust::host_vector<float> transformation,float threshhold)
+{
+	Eigen::Matrix3f rota1;
+	Eigen::Matrix3f rota2;
+	Eigen::Vector3f trans1;
+	Eigen::Vector3f trans2;
+
+	for(int j=0;j<3;j++)
+	{
+		trans1(j) = transformation[9+j]*1000.f;
+		trans2(j) = transformation[12+9+j]*1000.f;
+		for(int i=0;i<3;i++)
+		{
+			rota1(j,i) = transformation[j*3+i];
+			rota2(j,i) = transformation[12+j*3+i];
+		}
+	}
+
+
+	std::cout << "rota1 :\n" << rota1 << std::endl;
+	std::cout << "trans1 :\n" << trans1 << std::endl;
+
+
+	std::cout << "rota2 :\n" << rota2 << std::endl;
+	std::cout << "trans2 :\n" << trans2 << std::endl;
+
+	int count = 0;
+	for(int i=0;i<points_view1.size();i++)
+	{
+		float4 p1 = points_view1[i];
+		Eigen::Vector3f v1(p1.x,p1.y,p1.z);
+
+		float4 p2 = points_view2[i];
+		Eigen::Vector3f v2(p2.x,p2.y,p2.z);
+
+		Eigen::Vector3f diff = ((rota1*v1+trans1) - (rota2*v2+trans2));
+
+		if(diff.norm() <= threshhold)
+			count++;
+
+		printf("%f \n",diff.norm());
+	}
+
+	printf("count: %d",count);
+
+//	float4 p1 = points_view1[0];
+//	Eigen::Vector3f v1(p1.x,p1.y,p1.z);
+//
+//	printf("%f %f %f | ",p1.x,p1.y,p1.z);
+//	std::cout << "v1 :\n" << v1 << std::endl;
 }

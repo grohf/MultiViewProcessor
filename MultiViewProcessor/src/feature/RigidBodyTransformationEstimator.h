@@ -162,6 +162,7 @@ public:
 
 	void TestCorrelationMatrix(thrust::host_vector<float4> pos1,thrust::host_vector<float4> pos2,thrust::host_vector<float> correlationMatrix);
 
+	void TestCorrelationQuality(DeviceDataInfoPtr d_transformationsInfoPointer);
 };
 
 #endif /* RIGIDBODYTRANSFORMATIONESTIMATOR_H_ */

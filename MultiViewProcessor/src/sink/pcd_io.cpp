@@ -39,7 +39,7 @@ int host::io::PCDIOController::writeASCIIPCD(char *filename,float *data,unsigned
 			"\nCOUNT 1 1 1"
 			"\nWIDTH 640"
 			"\nHEIGHT 480"
-			"\nVIEWPOINT 0 0 0 0 1 0 0"
+			"\nVIEWPOINT 0 0 0 1 0 0 0"
 			"\nPOINTS 307200"
 			"\nDATA ascii"
 			"\n";

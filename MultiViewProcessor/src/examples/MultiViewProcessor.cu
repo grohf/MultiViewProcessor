@@ -98,7 +98,7 @@ void runMultiViewTest()
 	truncateThresholdFilter->setWorldCoordinates(src->getTargetData(SyncFreenectSource::PointXYZI));
 	p.addFilter(FilterPtr(truncateThresholdFilter));
 
-	ATrousFilter *atrousfilter = new ATrousFilter(2,3,10,5,2);
+	ATrousFilter *atrousfilter = new ATrousFilter(2,2,10,5,2);
 	atrousfilter->setInput2DPointCloud(src->getTargetData(SyncFreenectSource::PointXYZI));
 	atrousfilter->setInputSensorInfo(src->getTargetData(SyncFreenectSource::SensorInfoList));
 	atrousfilter->setPointIntensity(src->getTargetData(SyncFreenectSource::PointIntensity));
@@ -218,14 +218,15 @@ void TestTransformationerror()
 
 	EigenCheckClass *cpuCheck = new EigenCheckClass();
 	cpuCheck->createRotatedViews(views,views_synth,normals,normals_synth,transformationMatrix);
+//	cpuCheck->createRefrenceTransformationMatrices();
 
 //	for(int i=0;i<12;i++)
 //	{
 //		printf("%f | ",transformationMatrix[i]);
 //	}
 //	printf("\n");
-	TranformationValidator *validator = new TranformationValidator(2,64);
-	validator->TestTransformError(views,views_synth,normals,normals_synth,transformationMatrix);
+//	TranformationValidator *validator = new TranformationValidator(2,64);
+//	validator->TestTransformError(views,views_synth,normals,normals_synth,transformationMatrix);
 
 	/*
 	thrust::host_vector<float4> normals(views.size());
@@ -243,10 +244,57 @@ void TestTransformationerror()
 void TestSynthInput()
 {
 	Processor p;
-	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(1);
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false);
 	p.setSource(SourcePtr(src));
 
+	ATrousFilter *atrousfilter = new ATrousFilter(2,2,15,3,2);
+	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
+	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
+	atrousfilter->setPointIntensity(src->getIntensity());
+	p.addFilter(FilterPtr(atrousfilter));
+
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2,50);
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(nPCAestimator);
+
+	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
+	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFilter(FilterPtr(truncateThresholdFilter));
+
+	FPFH *fpfhEstimator = new FPFH(2);
+	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	fpfhEstimator->setNormals(nPCAestimator->getNormals());
+	p.addFeature(fpfhEstimator);
+
+
+	unsigned int r_ransac = 1024;
+
+	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,512,32);
+	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
+	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
+	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
+	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(rbEstimator);
+
 	p.start();
+
+//	thrust::device_ptr<float4> dptr = thrust::device_pointer_cast((float4 *)atrousfilter->getFilteredWorldCoordinates()->getDeviceDataPtr().get());
+//	thrust::device_vector<float4> d_points(dptr,dptr+2*640*480);
+//	thrust::host_vector<float4> h_points = d_points;
+//	for(int i=0;i<2*640*480;i++)
+//		if(i%5000==0)
+//			printf("%f %f %f | ",h_points[i].x,h_points[i].y,h_points[i].z);
+//
+//	printf("\n");
+
+	rbEstimator->TestCorrelationQuality(src->getGroundTruthTransformation());
+
+//	char **depth_pngs,**rgb_pngs;
+//	float *transformationMatrices;
+//	unsigned int lns[] = {1,2,3};
+//	EigenCheckClass *cpuCheck = new EigenCheckClass();
+//	cpuCheck->createRefrenceTransformationMatrices("/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",2,lns,depth_pngs,rgb_pngs,transformationMatrices);
+
 
 }
 

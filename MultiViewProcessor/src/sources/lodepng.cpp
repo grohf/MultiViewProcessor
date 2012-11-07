@@ -6127,6 +6127,7 @@ unsigned decode(std::vector<unsigned char>& out, unsigned& w, unsigned& h,
 unsigned decode(std::vector<unsigned char>& out, unsigned& w, unsigned& h, const std::string& filename,
                 LodePNGColorType colortype, unsigned bitdepth)
 {
+//	printf("filename: %s \n",filename.data());
   std::vector<unsigned char> buffer;
   load_file(buffer, filename);
   return decode(out, w, h, buffer, colortype, bitdepth);

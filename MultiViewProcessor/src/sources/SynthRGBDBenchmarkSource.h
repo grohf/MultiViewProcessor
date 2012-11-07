@@ -21,9 +21,10 @@ public:
 		PointRGBA,
 		PointIntensity,
 		SensorInfoList,
+		GroundTruthTransformations,
 	};
 
-	SynthRGBDBenchmarkSource(unsigned int n_view_);
+	SynthRGBDBenchmarkSource(unsigned int n_view_,char *baseDir_,bool transform=false);
 	virtual ~SynthRGBDBenchmarkSource();
 
 	void init();
@@ -34,9 +35,26 @@ public:
 		return getTargetData(PointXYZI);
 	}
 
+	DeviceDataInfoPtr getIntensity()
+	{
+		return getTargetData(PointIntensity);
+	}
+
+	DeviceDataInfoPtr getSensorV2InfoList()
+	{
+		return getTargetData(SensorInfoList);
+	}
+
+	DeviceDataInfoPtr getGroundTruthTransformation()
+	{
+		return getTargetData(GroundTruthTransformations);
+	}
+
 private:
 	dim3 grid,block;
 	unsigned int n_view;
+	char *baseDir;
+	bool transform;
 };
 
 #endif /* SYNTHRGBDBENCHMARKSOURCE_H_ */

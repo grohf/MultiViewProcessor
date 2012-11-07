@@ -70,6 +70,25 @@ typedef struct
 
 } SensorInfo;
 
+typedef struct
+{
+	float fx;
+	float fy;
+
+	float cx;
+	float cy;
+
+//	float d0;
+//	float d1;
+//	float d2;
+//	float d3;
+//	float d4;
+
+	unsigned int resX;
+	unsigned int resY;
+
+} SensorInfoV2;
+
 typedef boost::shared_ptr<void> DeviceDataPtr;
 
 class Processor;

@@ -254,18 +254,23 @@ namespace device
 	{
 
 		float4* pos;
+		SensorInfoV2 *sensorInfo;
 
 		__device__ __forceinline__ void
-		convertCXCYWZtoWXWYWZ(int cx,int cy, float wz, float &wx, float &wy) const
+		convertCXCYWZtoWXWYWZ(int ix,int iy, float wz, float &wx, float &wy, int view) const
 		{
 
-			double factor = (constant::sensorInfo_pix_size * wz)  / constant::sensorInfo_dist;
+//			double factor = (constant::sensorInfo_pix_size * wz)  / constant::sensorInfo_dist;
+//
+////			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
+////				printf("factor: %f ref_pix_size: %f ref_dist: %f \n",factor,constant::sensorInfo_pix_size,constant::sensorInfo_dist);
+//
+//			wx = (float) ((cx + 0.5 - 320) * factor);
+//			wy = (float) ((cy + 0.5 - 240) * factor);
 
-//			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
-//				printf("factor: %f ref_pix_size: %f ref_dist: %f \n",factor,constant::sensorInfo_pix_size,constant::sensorInfo_dist);
+			wx = (float) (((ix - sensorInfo[view].cx) * wz)/sensorInfo[view].fx);
+			wy = (float) (((iy - sensorInfo[view].cy) * wz)/sensorInfo[view].fy);
 
-			wx = (float) ((cx + 0.5 - 320) * factor);
-			wy = (float) ((cy + 0.5 - 240) * factor);
 
 		}
 
@@ -281,8 +286,18 @@ namespace device
 //				printf(" %f %f %f \n",pos[off].x,pos[off].y,pos[off].z);
 
 			float4 wc = pos[off];
-			convertCXCYWZtoWXWYWZ(sx,sy,wc.z,wc.x,wc.y);
+			convertCXCYWZtoWXWYWZ(sx,sy,wc.z,wc.x,wc.y,blockIdx.z);
 			pos[off] = wc;
+
+			if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.z==0 && blockIdx.x==0 && blockIdx.y==0)
+			{
+				for(int v=0;v<2;v++)
+				{
+					SensorInfoV2 sensor = sensorInfo[v];
+					printf("(%d)sensor info: %f %f %f %f \n",v,sensor.fx,sensor.fy,sensor.cx,sensor.cy);
+				}
+
+			}
 
 //			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
 //				printf(" %f %f %f \n",pos[off].x,pos[off].y,pos[off].z);
@@ -402,10 +417,10 @@ void ATrousFilter::init()
 	atrousfilter.sigma_depth = sigma_depth;
 	atrousfilter.sigma_intensity = sigma_intensity;
 
+
 	atrousfilter.input = (float4 *)getInputDataPointer(WorldCoordinates);
 	atrousfilter.input_intensity = (float *)getInputDataPointer(PointIntensity);
 	atrousfilter.output = (float4 *)getTargetDataPointer(FilteredWorldCoordinates);
-
 
 //	printf("atrous_radi: %d \n",atrous_radi);
 //	cudaMemcpyToSymbol(device::constant::atrous_radi,&atrous_radi,sizeof(unsigned int));
@@ -413,17 +428,19 @@ void ATrousFilter::init()
 
 	initAtrousConstants();
 
-	SensorInfo *d_sinfo = (SensorInfo *)getInputDataPointer(SensorInfoList);
-	cudaMemcpyToSymbol(device::constant::sensorInfo_pix_size,&(d_sinfo->pix_size),sizeof(double),0,cudaMemcpyDeviceToDevice);
-	cudaMemcpyToSymbol(device::constant::sensorInfo_dist,&(d_sinfo->dist),sizeof(double),0,cudaMemcpyDeviceToDevice);
-
-	SensorInfo h_sinfo;
-	checkCudaErrors(cudaMemcpy(&h_sinfo,d_sinfo,sizeof(SensorInfo),cudaMemcpyDeviceToHost));
+//	SensorInfoV2 *d_sinfo = (SensorInfoV2 *)getInputDataPointer(SensorInfoList);
+//	cudaMemcpyToSymbol(device::constant::sensorInfo_pix_size,&(d_sinfo->pix_size),sizeof(double),0,cudaMemcpyDeviceToDevice);
+//	cudaMemcpyToSymbol(device::constant::sensorInfo_dist,&(d_sinfo->dist),sizeof(double),0,cudaMemcpyDeviceToDevice);
+//
+//
+//	SensorInfo h_sinfo;
+//	checkCudaErrors(cudaMemcpy(&h_sinfo,d_sinfo,sizeof(SensorInfo),cudaMemcpyDeviceToHost));
 
 //	printf("host: pix_size: %f | dist %f \n",h_sinfo.pix_size,h_sinfo.dist);
 
 
 	coordsUpdater.pos = (float4 *)getTargetDataPointer(FilteredWorldCoordinates);
+	coordsUpdater.sensorInfo = (SensorInfoV2 *)getInputDataPointer(SensorInfoList);
 }
 
 void ATrousFilter::initAtrousConstants()

@@ -16,6 +16,7 @@
 #include "SVDEstimatorCPU.h"
 #include "RigidBodyTransformationEstimator.h"
 #include "utils.hpp"
+#include "../debug/EigenCheckClass.h"
 
 
 #define CURAND_CALL ( x ) do { if (( x ) != CURAND_STATUS_SUCCESS ) { \
@@ -1192,6 +1193,14 @@ void RigidBodyTransformationEstimator::execute()
 
 //	printf("d_infoList: %d \n",correspondanceEstimator.infoList);
 
+//	thrust::device_ptr<float4> dptr = thrust::device_pointer_cast((float4 *)getInputDataPointer(Coordiantes));
+//	thrust::device_vector<float4> d_points(dptr,dptr+n_view*640*480);
+//	thrust::host_vector<float4> h_points = d_points;
+//	for(int i=0;i<2*640*480;i++)
+//		if(i%5000==0)
+//			printf("1: %f %f %f | ",h_points[i].x,h_points[i].y,h_points[i].z);
+//	printf("\n");
+
 	checkCudaErrors(curandGenerateUniform(gen,correspondanceEstimator.rndList,s));
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
@@ -1239,6 +1248,12 @@ void RigidBodyTransformationEstimator::execute()
 //		printf(" %u  \n",h_metadata[off]);
 //	}
 
+//	thrust::device_vector<float4> d_points2(thrust::device_pointer_cast((float4 *)getTargetDataPointer(Coordiantes)),thrust::device_pointer_cast((float4 *)getTargetDataPointer(Coordiantes))+n_view*640*480);
+//	thrust::host_vector<float4> h_points2 = d_points2;
+//	for(int i=0;i<2*640*480;i++)
+//		if(i%5000==0)
+//			printf("2: %f %f %f | ",h_points2[i].x,h_points2[i].y,h_points2[i].z);
+//	printf("\n");
 
 //	float *h_m = (float *)malloc(rn*12*sizeof(float));
 //	checkCudaErrors( cudaMemcpy(h_m,deMeanedCorrelatonMEstimator.output_transformationMatrices,rn*12*sizeof(float),cudaMemcpyDeviceToHost));
@@ -1460,5 +1475,51 @@ RigidBodyTransformationEstimator::TestCorrelationMatrix(thrust::host_vector<floa
 //	{
 //		printf("%f ",correlationMatrix[i]);
 //	}
+
+}
+
+void
+RigidBodyTransformationEstimator::TestCorrelationQuality(DeviceDataInfoPtr d_transformationsInfoPointer)
+{
+	checkCudaErrors(curandGenerateUniform(gen,correspondanceEstimator.rndList,s));
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+
+	correspondanceEstimator.view_src = 0;
+	correspondanceEstimator.view_target = 1;
+	device::estimateCorrespondance<<<grid,block>>>(correspondanceEstimator);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	thrust::device_vector<float> d_errorList(thrust::device_pointer_cast(correspondanceEstimator.output_prob),thrust::device_pointer_cast(correspondanceEstimator.output_prob)+k*s);
+	thrust::device_vector<unsigned int> d_errorIdxList(thrust::device_pointer_cast(correspondanceEstimator.output_idx),thrust::device_pointer_cast(correspondanceEstimator.output_idx)+k*s);
+
+	thrust::device_vector<float4> d_points(thrust::device_pointer_cast((float4 *)getInputDataPointer(Coordiantes)),thrust::device_pointer_cast((float4 *)getInputDataPointer(Coordiantes))+n_view*640*480);
+	thrust::device_vector<unsigned int> d_idxList(thrust::device_pointer_cast(correspondanceEstimator.output_idx),thrust::device_pointer_cast(correspondanceEstimator.output_idx)+s);
+
+
+	thrust::host_vector<float> h_errorList = d_errorList;
+	thrust::host_vector<unsigned int> h_errorIdxList = d_errorIdxList;
+
+	thrust::host_vector<float4> h_points = d_points;
+	thrust::host_vector<unsigned int> h_idxList = d_idxList;
+
+	thrust::host_vector<float4> h_points1(s);
+	thrust::host_vector<float4> h_points2(s);
+
+	for(int i=0;i<s;i++)
+	{
+		h_points1[i] = h_points[h_idxList[i]];
+//		printf("(%d) %f %f %f | ",i,(h_points1[i]).x,(h_points1[i]).y,(h_points1[i]).z);
+		h_points2[i] = h_points[640*480+h_errorIdxList[i*k+0]];
+	}
+
+	thrust::device_ptr<float> d_transPtr = thrust::device_pointer_cast((float *)(d_transformationsInfoPointer->getDeviceDataPtr().get()));
+	thrust::device_vector<float> d_transform(d_transPtr,d_transPtr+12*n_view);
+	thrust::host_vector<float> h_transformMatrices = d_transform;
+
+	EigenCheckClass::checkCorrelationQuality(h_points1,h_points2,h_transformMatrices,30);
+
 }
 

@@ -31,9 +31,9 @@
 								<option id="nvcc.compiler.pic.1947788849" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
 								<option id="nvcc.compiler.include.paths.709076602" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/MultiViewProcessor/src/include}&quot;"/>
-									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
+									<listOptionValue builtIn="false" value="/usr/local/cuda/samples/common/inc"/>
 								</option>
 								<option id="nvcc.compiler.maxregcount.1601824716" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
 								<option id="nvcc.compiler.usefastmath.1211152740" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
@@ -65,10 +65,10 @@
 			</storageModule>
 			<storageModule moduleId="com.nvidia.cuda.ide.build.project.ICudaProjectConfiguration">
 				<executable devicelink="true">
-					<sass major="2" minor="0"/>
 					<ptx major="2" minor="0"/>
+					<sass major="3" minor="0"/>
 				</executable>
-				<editor-arch major="2" minor="0"/>
+				<editor-arch major="3" minor="0"/>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 		</cconfiguration>
@@ -100,9 +100,9 @@
 								<option id="nvcc.compiler.pic.1210926291" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
 								<option id="nvcc.compiler.include.paths.2025243601" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/MultiViewProcessor/src/include}&quot;"/>
-									<listOptionValue builtIn="false" value="/home/avo/NVIDIA_CUDA-5.0_Samples/C/common/inc"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/libfreenect"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
+									<listOptionValue builtIn="false" value="/usr/local/cuda/samples/common/inc"/>
 								</option>
 								<option id="nvcc.compiler.maxregcount.464865780" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
 								<option id="nvcc.compiler.usefastmath.296369860" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
