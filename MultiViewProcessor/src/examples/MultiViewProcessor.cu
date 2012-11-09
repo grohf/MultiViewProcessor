@@ -33,6 +33,7 @@
 #include "../filter/TruncateThresholdFilter.h"
 #include "../feature/NormalPCAEstimator.h"
 #include "../feature/FPFH.h"
+#include "../feature/DFPFHEstimator.h"
 #include "../feature/SVDEstimatorCPU.h"
 #include "../feature/RigidBodyTransformationEstimator.h"
 #include "../feature/TranformationValidator.h"
@@ -149,6 +150,9 @@ void coorespTest()
 
 void TesterFct()
 {
+	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(1);
+	dfpfhEstimator->TestDFPFHE();
+
 //	TranformationValidator *validator = new TranformationValidator(2,512);
 //	validator->TestMinimumPicker();
 //	validator->TestSumCalculator();
@@ -161,19 +165,19 @@ void TesterFct()
 //	rbEstimator->TestCorrelationMatrix(cpuCheck->pos_m,cpuCheck->pos_d,cpuCheck->H);
 
 //	unsigned int k = 0;
-	float f = 0;
-	device::setValid(f);
-//	device::setReconstructed(f,31);
-
-	printf("%d %d \n",device::isReconstructed(f),device::getReconstructionLevel(f));
-
-	device::unsetReconstructed(f);
-
-	printf("%d \n",device::isReconstructed(f));
-
-	device::setForeground(f);
-
-	printf("%d %d %d",device::isForeground(f),device::isBackground(f),device::isSegmented(f));
+//	float f = 0;
+//	device::setValid(f);
+////	device::setReconstructed(f,31);
+//
+//	printf("%d %d \n",device::isReconstructed(f),device::getReconstructionLevel(f));
+//
+//	device::unsetReconstructed(f);
+//
+//	printf("%d \n",device::isReconstructed(f));
+//
+//	device::setForeground(f);
+//
+//	printf("%d %d %d",device::isForeground(f),device::isBackground(f),device::isSegmented(f));
 }
 
 void TestTransformationerror()
@@ -380,9 +384,9 @@ int main(int argc, char **argv) {
 //	runTestProcessor();
 //	runNormalTest();
 
-//	TesterFct();
+	TesterFct();
 //	TestTransformationerror();
-	TestSynthInput();
+//	TestSynthInput();
 //	PointInfoTest();
 
 
