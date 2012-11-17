@@ -10,6 +10,86 @@
 
 namespace device
 {
+
+template<unsigned int blockSize, typename T>
+__device__ __forceinline__ void reduceBlock(T* shm)
+{
+
+	  unsigned int tid = threadIdx.x;
+	  float sum = shm[tid];
+	  if (blockSize >= 1024) { if(tid < 512) 	{ shm[tid] = sum = sum + shm[tid + 512]; 	} __syncthreads(); }
+	  if (blockSize >=  512) { if(tid < 256) 	{ shm[tid] = sum = sum + shm[tid + 256]; 	} __syncthreads(); }
+	  if (blockSize >=  256) { if(tid < 128) 	{ shm[tid] = sum = sum + shm[tid + 128]; 	} __syncthreads(); }
+	  if (blockSize >=  128) { if(tid < 64) 	{ shm[tid] = sum = sum + shm[tid + 64]; 	} __syncthreads(); }
+
+	  if(tid < 32)
+	  {
+		  volatile T* smem = shm;
+		  if (blockSize >=  64) { smem[tid] = sum = sum + smem[tid + 32]; 	}
+		  if (blockSize >=  32) { smem[tid] = sum = sum + smem[tid + 16]; 	}
+		  if (blockSize >=  16) { smem[tid] = sum = sum + smem[tid +  8]; 	}
+		  if (blockSize >=   8) { smem[tid] = sum = sum + smem[tid +  4]; 	}
+		  if (blockSize >=   4) { smem[tid] = sum = sum + smem[tid +  2]; 	}
+		  if (blockSize >=   2) { smem[tid] = sum = sum + smem[tid +  1]; 	}
+	  }
+}
+
+template<unsigned int blockSize, typename T>
+__device__ __forceinline__ void reduceBlockNoReg(T* shm)
+{
+
+	  unsigned int tid = threadIdx.x;
+	  if (blockSize >= 1024) { if(tid < 512) 	{ shm[tid] += shm[tid + 512]; 	} __syncthreads(); }
+	  if (blockSize >=  512) { if(tid < 256) 	{ shm[tid] += shm[tid + 256]; 	} __syncthreads(); }
+	  if (blockSize >=  256) { if(tid < 128) 	{ shm[tid] += shm[tid + 128]; 	} __syncthreads(); }
+	  if (blockSize >=  128) { if(tid < 64) 	{ shm[tid] += shm[tid + 64]; 	} __syncthreads(); }
+
+	  if(tid < 32)
+	  {
+		  volatile T* smem = shm;
+		  if (blockSize >=  64) { smem[tid] += smem[tid + 32]; 	}
+		  if (blockSize >=  32) { smem[tid] += smem[tid + 16]; 	}
+		  if (blockSize >=  16) { smem[tid] += smem[tid +  8]; 	}
+		  if (blockSize >=   8) { smem[tid] += smem[tid +  4]; 	}
+		  if (blockSize >=   4) { smem[tid] += smem[tid +  2]; 	}
+		  if (blockSize >=   2) { smem[tid] += smem[tid +  1]; 	}
+	  }
+}
+
+template<unsigned int blockSize, typename T>
+__device__ __forceinline__ void reduceBlockNoReg(T* shm,int lines)
+{
+
+	  unsigned int tid = threadIdx.x;
+	  if (blockSize >= 1024) { if(tid < 512) 	{ for(int i=0;i<lines;i++){ shm[i*blockSize + tid] += shm[i*blockSize + tid + 512]; } 	} __syncthreads(); }
+	  if (blockSize >=  512) { if(tid < 256) 	{ for(int i=0;i<lines;i++){ shm[i*blockSize + tid] += shm[i*blockSize + tid + 256]; } 	} __syncthreads(); }
+	  if (blockSize >=  256) { if(tid < 128) 	{ for(int i=0;i<lines;i++){ shm[i*blockSize + tid] += shm[i*blockSize + tid + 128]; }	} __syncthreads(); }
+	  if (blockSize >=  128) { if(tid < 64) 	{ for(int i=0;i<lines;i++){ shm[i*blockSize + tid] += shm[i*blockSize + tid +  64]; } 	} __syncthreads(); }
+
+	  if(tid < 32)
+	  {
+		  volatile T* smem = shm;
+		  if (blockSize >=  64) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid + 32]; } 	}
+		  if (blockSize >=  32) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid + 16]; } 	}
+		  if (blockSize >=  16) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid +  8]; }	}
+		  if (blockSize >=   8) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid +  4]; } 	}
+		  if (blockSize >=   4) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid +  2]; } 	}
+		  if (blockSize >=   2) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid +  1]; } 	}
+	  }
+}
+
+class Div
+{
+public:
+	__device__ __forceinline__ void operator() (float *a, float *b,unsigned int off)
+	{
+
+	}
+
+};
+
+
+
 	__device__ __forceinline__ float
 	dotf43(const float4& v1,const float4& v2)
 	{

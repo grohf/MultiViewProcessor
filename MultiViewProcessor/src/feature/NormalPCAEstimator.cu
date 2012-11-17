@@ -346,9 +346,9 @@ NormalPCAEstimator::execute()
 	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
 	checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",2);
-	host::io::PCDIOController ioCtrl;
-	ioCtrl.writeASCIIPCDNormals(path,(float *)h_f4_normals,640*480);
+//	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",2);
+//	host::io::PCDIOController ioCtrl;
+//	ioCtrl.writeASCIIPCDNormals(path,(float *)h_f4_normals,640*480);
 //
 //	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
 //	checkCudaErrors(cudaMemcpy(h_f4_depth,normalEstimator.input,640*480*sizeof(float4),cudaMemcpyDeviceToHost));

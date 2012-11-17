@@ -109,11 +109,15 @@ void runMultiViewTest()
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
+	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(2);
+	dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
+	p.addFeature(dfpfhEstimator);
 
-	FPFH *fpfhEstimator = new FPFH(2);
-	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
-	fpfhEstimator->setNormals(nPCAestimator->getNormals());
-	p.addFeature(fpfhEstimator);
+//	FPFH *fpfhEstimator = new FPFH(2);
+//	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+//	fpfhEstimator->setNormals(nPCAestimator->getNormals());
+//	p.addFeature(fpfhEstimator);
 
 //	unsigned int r_ransac = 4096;
 //
@@ -265,20 +269,25 @@ void TestSynthInput()
 	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(FilterPtr(truncateThresholdFilter));
 
-	FPFH *fpfhEstimator = new FPFH(2);
-	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
-	fpfhEstimator->setNormals(nPCAestimator->getNormals());
-	p.addFeature(fpfhEstimator);
+//	FPFH *fpfhEstimator = new FPFH(2);
+//	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+//	fpfhEstimator->setNormals(nPCAestimator->getNormals());
+//	p.addFeature(fpfhEstimator);
+//
+//	unsigned int r_ransac = 1024;
+//
+//	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,512,32);
+//	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
+//	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
+//	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
+//	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+//	p.addFeature(rbEstimator);
 
 
-	unsigned int r_ransac = 1024;
-
-	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,512,32);
-	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
-	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
-	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
-	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
-	p.addFeature(rbEstimator);
+	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(2);
+	dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
+	p.addFeature(dfpfhEstimator);
 
 	p.start();
 
@@ -291,7 +300,11 @@ void TestSynthInput()
 //
 //	printf("\n");
 
-	rbEstimator->TestCorrelationQuality(src->getGroundTruthTransformation());
+
+
+//	rbEstimator->TestCorrelationQuality(src->getGroundTruthTransformation());
+
+
 
 //	char **depth_pngs,**rgb_pngs;
 //	float *transformationMatrices;
@@ -384,12 +397,15 @@ int main(int argc, char **argv) {
 //	runTestProcessor();
 //	runNormalTest();
 
-	TesterFct();
+
+//	TesterFct();
 //	TestTransformationerror();
-//	TestSynthInput();
+
 //	PointInfoTest();
 
 
+	TesterFct();
+//	TestSynthInput();
 
 
 //	runMultiViewTest();
