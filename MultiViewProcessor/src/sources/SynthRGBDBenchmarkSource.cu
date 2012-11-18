@@ -131,7 +131,7 @@ namespace device
 
 device::SynthWCLoader synthRGBDLoader;
 
-SynthRGBDBenchmarkSource::SynthRGBDBenchmarkSource(unsigned int n_view_,char *baseDir,bool transform) : n_view(n_view_), baseDir(baseDir),transform(transform)
+SynthRGBDBenchmarkSource::SynthRGBDBenchmarkSource(unsigned int n_view_,char *baseDir,bool transform,bool output) : n_view(n_view_), baseDir(baseDir),transform(transform), output(output)
 {
 	DeviceDataParams imageDepthParams;
 	imageDepthParams.elements = 640*480*n_view;
@@ -248,8 +248,8 @@ void SynthRGBDBenchmarkSource::loadFrame()
 //	for(int i=0;i<n_view;i++)
 //		depth_lines[i]=i*50;
 
-	depth_lines[0] = 100;
-	depth_lines[1] = 160;
+	depth_lines[0] = 0;
+	depth_lines[1] = 20;
 
 	std::string base(baseDir);
 	printf("base: %s \n",base.data());
@@ -309,13 +309,13 @@ void SynthRGBDBenchmarkSource::loadFrame()
 				std::string spath = (base+std::string(token[1]));
 				image.clear();
 				unsigned error = lodepng::decode(image, width, height, spath.data(),LCT_GREY,16);
-				printf("error: %d \n",error);
+//				printf("error: %d \n",error);
 				for(int i=0;i<640*480;i++)
 				{
 					h_depth[l*640*480+i] = (float)(((image[i*2]<<8) + image[i*2+1])/5.f);
 				}
 
-				printf("(%d) loaded %s ->  w: %d | h: %d -> %f \n",l,spath.data(),width,height,h_depth[l*640*480+640*200+300]);
+//				printf("(%d) loaded %s ->  w: %d | h: %d -> %f \n",l,spath.data(),width,height,h_depth[l*640*480+640*200+300]);
 
 				if(++l==n_view)
 					cond = false;
@@ -367,6 +367,7 @@ void SynthRGBDBenchmarkSource::loadFrame()
 					else
 					{
 						printf("high: %s \n",token[1]);
+						image.clear();
 						unsigned error = lodepng::decode(image, width, height, (base+std::string(token[1])).data(),LCT_RGB,8);
 						for(int i=0;i<640*480;i++)
 						{
@@ -466,25 +467,28 @@ void SynthRGBDBenchmarkSource::loadFrame()
 
 
 	char path[50];
-	uchar4 *h_uc4_depth = (uchar4 *)malloc(640*480*sizeof(uchar4));
-	uchar4 *h_uc4_rgb = (uchar4 *)malloc(640*480*sizeof(uchar4));
-	for(int v=0;v<n_view;v++)
+	if(output)
 	{
-		for(int i=0;i<640*480;i++)
+		uchar4 *h_uc4_depth = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		uchar4 *h_uc4_rgb = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		for(int v=0;v<n_view;v++)
 		{
-			unsigned char g = (h_depth[v*640*480+i]/10000.f)*255.f;
-			h_uc4_depth[i] = make_uchar4(g,g,g,128);
+			for(int i=0;i<640*480;i++)
+			{
+				unsigned char g = (h_depth[v*640*480+i]/10000.f)*255.f;
+				h_uc4_depth[i] = make_uchar4(g,g,g,128);
 
-			h_uc4_rgb[i] = make_uchar4(h_rgb[(v*640*480+i)*3+0],h_rgb[(v*640*480+i)*3+1],h_rgb[(v*640*480+i)*3+2],128);
+				h_uc4_rgb[i] = make_uchar4(h_rgb[(v*640*480+i)*3+0],h_rgb[(v*640*480+i)*3+1],h_rgb[(v*640*480+i)*3+2],128);
+			}
+			sprintf(path,"/home/avo/pcds/synth_depth%d.ppm",v);
+			sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
+
+			sprintf(path,"/home/avo/pcds/synth_rgb%d.ppm",v);
+			sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
+
+	//		sprintf(path,"/home/avo/pcds/synth_depth%d.ppm",v);
+	//		sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 		}
-		sprintf(path,"/home/avo/pcds/synth_depth%d.ppm",v);
-		sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
-
-		sprintf(path,"/home/avo/pcds/synth_rgb%d.ppm",v);
-		sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
-
-//		sprintf(path,"/home/avo/pcds/synth_depth%d.ppm",v);
-//		sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 	}
 
 	checkCudaErrors(cudaMemcpy(synthRGBDLoader.rgb,h_rgb.data(),n_view*640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
@@ -516,14 +520,17 @@ void SynthRGBDBenchmarkSource::loadFrame()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	for(int i=0;i<n_view;i++)
+	if(output)
 	{
-		float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-		checkCudaErrors(cudaMemcpy(h_f4_depth,synthRGBDLoader.xyzi+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+		for(int i=0;i<n_view;i++)
+		{
+			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+			checkCudaErrors(cudaMemcpy(h_f4_depth,synthRGBDLoader.xyzi+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-		sprintf(path,"/home/avo/pcds/synth_wc_points_%d.pcd",i);
-		host::io::PCDIOController pcdIOCtrl;
-		pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+			sprintf(path,"/home/avo/pcds/synth_wc_points_%d.pcd",i);
+			host::io::PCDIOController pcdIOCtrl;
+			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
+		}
 	}
 
 	printf("data loaded... \n");

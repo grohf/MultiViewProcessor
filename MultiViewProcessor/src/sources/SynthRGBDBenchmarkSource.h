@@ -24,7 +24,7 @@ public:
 		GroundTruthTransformations,
 	};
 
-	SynthRGBDBenchmarkSource(unsigned int n_view_,char *baseDir_,bool transform=false);
+	SynthRGBDBenchmarkSource(unsigned int n_view_,char *baseDir_,bool transform=false,bool output=false);
 	virtual ~SynthRGBDBenchmarkSource();
 
 	void init();
@@ -55,6 +55,7 @@ private:
 	unsigned int n_view;
 	char *baseDir;
 	bool transform;
+	bool output;
 };
 
 #endif /* SYNTHRGBDBENCHMARKSOURCE_H_ */

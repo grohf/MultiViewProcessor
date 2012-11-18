@@ -265,7 +265,7 @@ void TestSynthInput()
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
-	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,600.f,2000.f);
+	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,400.f,2000.f);
 	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(FilterPtr(truncateThresholdFilter));
 
@@ -404,8 +404,8 @@ int main(int argc, char **argv) {
 //	PointInfoTest();
 
 
-	TesterFct();
-//	TestSynthInput();
+//	TesterFct();
+	TestSynthInput();
 
 
 //	runMultiViewTest();

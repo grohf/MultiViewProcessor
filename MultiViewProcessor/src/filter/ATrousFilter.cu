@@ -184,6 +184,8 @@ namespace device
 			float mid_depth = shm_pos[off].z;
 			float mid_luma = shm_pos[off].w;
 
+			float4 mid_p = shm_pos[off];
+
 			float cur_depth;
 
 			float weight;
@@ -194,12 +196,14 @@ namespace device
 					off = (threadIdx.y+sy)*constant::lx+threadIdx.x+sx;
 					cur_depth = shm_pos[off].z;
 
-					weight = constant::atrous_coef[sy*constant::atrous_length+sx];
+					weight = 1.f;//constant::atrous_coef[sy*constant::atrous_length+sx];
 					if(cur_depth==0.0f) weight = 0.0f;
 
 					if(mid_depth != 0.0f && (sigma_depth > 0) )
 					{
-						weight *= __expf(-0.5f*(abs(mid_depth-cur_depth)/(sigma_depth * sigma_depth)));
+						float d = sqrtf((mid_p.x - shm_pos[off].x) * (mid_p.x - shm_pos[off].x) + (mid_p.y - shm_pos[off].y)*(mid_p.y - shm_pos[off].y) + (mid_p.z - shm_pos[off].z)*(mid_p.z - shm_pos[off].z));
+						weight *= __expf(-0.5f*(d/(sigma_depth * sigma_depth)));
+//						weight *= __expf(-0.5f*(abs(mid_depth-cur_depth)/(sigma_depth * sigma_depth)));
 					}
 
 					if(sigma_intensity > 0)
@@ -289,15 +293,15 @@ namespace device
 			convertCXCYWZtoWXWYWZ(sx,sy,wc.z,wc.x,wc.y,blockIdx.z);
 			pos[off] = wc;
 
-			if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.z==0 && blockIdx.x==0 && blockIdx.y==0)
-			{
-				for(int v=0;v<2;v++)
-				{
-					SensorInfoV2 sensor = sensorInfo[v];
-					printf("(%d)sensor info: %f %f %f %f \n",v,sensor.fx,sensor.fy,sensor.cx,sensor.cy);
-				}
-
-			}
+//			if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.z==0 && blockIdx.x==0 && blockIdx.y==0)
+//			{
+//				for(int v=0;v<2;v++)
+//				{
+//					SensorInfoV2 sensor = sensorInfo[v];
+////					printf("(%d)sensor info: %f %f %f %f \n",v,sensor.fx,sensor.fy,sensor.cx,sensor.cy);
+//				}
+//
+//			}
 
 //			if(blockIdx.x==10&&blockIdx.y==10&&threadIdx.x==10&&threadIdx.y==10)
 //				printf(" %f %f %f \n",pos[off].x,pos[off].y,pos[off].z);
@@ -368,22 +372,25 @@ void ATrousFilter::execute()
 ////	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
 ////	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
 ////
-	float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-	checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-
-	uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
-	for(int i=0;i<640*480;i++)
+	for(int v=0;v<n_view;v++)
 	{
-		unsigned char g = h_f4_depth[i].z/20;
-		h_uc4_depth[i] = make_uchar4(g,g,g,128);
+		float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+		checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output+v*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-		if(!device::isValid(h_f4_depth[i].w)) h_uc4_depth[i].x = 255;
+		uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
+		for(int i=0;i<640*480;i++)
+		{
+			unsigned char g = h_f4_depth[i].z/20;
+			h_uc4_depth[i] = make_uchar4(g,g,g,128);
 
-		if(device::isReconstructed(h_f4_depth[i].w)) h_uc4_depth[i].y = 255;
+			if(!device::isValid(h_f4_depth[i].w)) h_uc4_depth[i].x = 255;
+
+			if(device::isReconstructed(h_f4_depth[i].w)) h_uc4_depth[i].y = 255;
+		}
+
+		sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",v);
+		sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 	}
-
-	sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",0);
-	sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 
 
 

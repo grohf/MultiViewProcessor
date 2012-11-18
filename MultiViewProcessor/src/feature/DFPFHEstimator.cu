@@ -348,19 +348,19 @@ namespace device
 
 			__syncthreads();
 
-			if(tid==1 && blockIdx.x > 4110 && blockIdx.x < 4115 && blockIdx.z==0)
-			{
-				printf("%d/%d -> %d/%d -> %f %f %f %f -> %d %d (%d>%d)->%d %d \n",blockIdx.x,tid,shm_off[tid],shm_off[tid+points_per_block],shm_pos[tid].x,shm_pos[tid].y,shm_pos[tid].z,shm_pos[tid].w,shm_pos[wid].z==0, input_bins_sdfpfh[640*480*blockIdx.z*bins_n_meta + 640*480*bins + blockIdx.x*points_per_block + wid]==0 , getReconstructionLevel(shm_pos[wid].w),maxReconstructuionLevel , getReconstructionLevel(shm_pos[wid].w)>maxReconstructuionLevel, !isForeground(shm_pos[wid].w) );
-
-			}
+//			if(tid==1 && blockIdx.x > 4110 && blockIdx.x < 4115 && blockIdx.z==0)
+//			{
+//				printf("%d/%d -> %d/%d -> %f %f %f %f -> %d %d (%d>%d)->%d %d \n",blockIdx.x,tid,shm_off[tid],shm_off[tid+points_per_block],shm_pos[tid].x,shm_pos[tid].y,shm_pos[tid].z,shm_pos[tid].w,shm_pos[wid].z==0, input_bins_sdfpfh[640*480*blockIdx.z*bins_n_meta + 640*480*bins + blockIdx.x*points_per_block + wid]==0 , getReconstructionLevel(shm_pos[wid].w),maxReconstructuionLevel , getReconstructionLevel(shm_pos[wid].w)>maxReconstructuionLevel, !isForeground(shm_pos[wid].w) );
+//
+//			}
 
 			if(!(shm_pos[wid].z==0 || input_bins_sdfpfh[640*480*blockIdx.z*bins_n_meta + 640*480*bins + blockIdx.x*points_per_block + wid]==0 || getReconstructionLevel(shm_pos[wid].w)>maxReconstructuionLevel ||   !isForeground(shm_pos[wid].w)))
 			{
 //				unsigned int point_count = 0;
 //				unsigned int invalid_points = 0;
 				unsigned int warpRuns = (lx*ly-1)/WARP_SIZE +1;
-				if(blockIdx.z==0 && blockIdx.x==0 && tid==0)
-					printf("warpRuns: %d | lx*ly: %d \n",warpRuns,lx*ly);
+//				if(blockIdx.z==0 && blockIdx.x==0 && tid==0)
+//					printf("warpRuns: %d | lx*ly: %d \n",warpRuns,lx*ly);
 				for(int r=0;r<warpRuns;r++)
 				{
 					unsigned int j = r*WARP_SIZE+wtid;
@@ -452,14 +452,14 @@ namespace device
 			__shared__ float shm_buffer[shared_buffer];
 
 			unsigned int tid = threadIdx.x;
-			shm_count[tid] = input_bins[blockIdx.z*640*480+bins*640*480+tid];
+			shm_count[tid] = input_bins[blockIdx.z*640*480*bins_n_meta+bins*640*480+blockIdx.x*dx+tid];
 			__syncthreads();
 			reduceBlock<dx>(shm_count);
 			__syncthreads();
 
 			if(tid==0)
 			{
-				output_block_mean[blockIdx.z*gridDim.x+bins*gridDim.x+blockIdx.x] = shm_count[0];// (shm_count[0]>0)?1:0;
+				output_block_mean[blockIdx.z*gridDim.x*bins_n_meta + bins*gridDim.x+blockIdx.x] = shm_count[0];// (shm_count[0]>0)?1:0;
 			}
 
 			if(shm_count[0]<=0)
@@ -480,14 +480,14 @@ namespace device
 				unsigned int lines = ((l+1)*shared_lines<bins)?shared_lines:bins-l*shared_lines;
 				for(int i=0;i<lines;i++)
 				{
-					shm_buffer[i*dx+tid] = input_bins[blockIdx.z*640*480+(l*shared_lines+i)*640*480+blockIdx.x*dx+tid];
+					shm_buffer[i*dx+tid] = input_bins[blockIdx.z*640*480*bins_n_meta+(l*shared_lines+i)*640*480+blockIdx.x*dx+tid];
 				}
 				__syncthreads();
 				reduceBlockNoReg<dx>(shm_buffer,lines);
 				__syncthreads();
 
 				if(tid<lines)
-					output_block_mean[blockIdx.z*gridDim.x+(l*shared_lines+tid)*gridDim.x+blockIdx.x] = shm_buffer[tid*dx];///shm_count[0];
+					output_block_mean[blockIdx.z*gridDim.x*bins_n_meta+(l*shared_lines+tid)*gridDim.x+blockIdx.x] = shm_buffer[tid*dx];///shm_count[0];
 
 //				__syncthreads();
 
@@ -592,17 +592,26 @@ namespace device
 	        unsigned int tid = threadIdx.x;
 	        unsigned int gridSize = dx*2*gridDim.x;
 
+	        if(tid==0)
+	        	printf("block: %d \n",blockIdx.z);
 
+	        if(blockIdx.z==1 & tid==0)
+	        {
+	        	for(int t=0;t<length;t+=50)
+	        	{
+		    			printf("inKernelCount(%d): %f \n",t,input_bins[blockIdx.z*length*bins_n_meta+bins*length+t]);
+	        	}
+	        }
 
 	    	float sum = 0.f;
-	    	unsigned int i = blockIdx.x*dx*2 + threadIdx.x;
+	    	unsigned int i = blockIdx.x*dx*2 + tid;
 	    	while(i<length)
 	    	{
-	    		sum += input_bins[blockIdx.x*length*bins_n_meta+bins*length+i];
+	    		sum += input_bins[blockIdx.z*length*bins_n_meta+bins*length+i];
 
 	            // ensure we don't read out of bounds -- this is optimized away for powerOf2 sized arrays
 	            if ( (i + dx) < length)
-	            	sum += input_bins[blockIdx.x*length*bins_n_meta+bins*length+i+dx];
+	            	sum += input_bins[blockIdx.z*length*bins_n_meta+bins*length+i+dx];
 
 	            i += gridSize;
 	    	}
@@ -614,7 +623,7 @@ namespace device
 
 	        if(tid==0)
 			{
-	        	output_block_mean[blockIdx.x*bins_n_meta+bins] = shm_count[0];// (shm_count[0]>0)?1.f:0.f;
+	        	output_block_mean[blockIdx.z*bins_n_meta+bins] = shm_count[0];// (shm_count[0]>0)?1.f:0.f;
 	        	printf("count: %f \n",shm_count[0]);
 			}
 
@@ -635,10 +644,10 @@ namespace device
 					i = blockIdx.x*dx*2 + threadIdx.x;
 					while(i<length)
 					{
-						sum += input_bins[blockIdx.x*length+(l*shared_lines+b)*length+i];
+						sum += input_bins[blockIdx.z*length*bins_n_meta+(l*shared_lines+b)*length+i];
 
 						if ( (i + dx) < length)
-							sum += input_bins[blockIdx.x*length*bins_n_meta+(l*shared_lines+b)*length+i+dx];
+							sum += input_bins[blockIdx.z*length*bins_n_meta+(l*shared_lines+b)*length+i+dx];
 
 						i += gridSize;
 					}
@@ -649,11 +658,12 @@ namespace device
 				reduceBlockNoReg<dx>(shm_buffer,lines);
 				__syncthreads();
 				if(tid<lines)
-					output_block_mean[blockIdx.x*bins_n_meta+(l*shared_lines+tid)] = shm_buffer[tid*dx]/shm_count[0];
+					output_block_mean[blockIdx.z*bins_n_meta+(l*shared_lines+tid)] = shm_buffer[tid*dx]/shm_count[0];
 			}
 
 		}
 	};
+	__global__ void computeMeanDFPFH(const MeanDFPFHEstimator<1024> meandfpfhe){ meandfpfhe(); }
 	__global__ void computeMeanDFPFH(const MeanDFPFHEstimator<512> meandfpfhe){ meandfpfhe(); }
 
 	struct DivDFPFHEstimator: public DFPFHBaseKernel
@@ -820,6 +830,7 @@ namespace device
 		};
 
 		float beta;
+		bool intersection;
 
 		float *input_div1;
 		float *input_div2;
@@ -830,27 +841,35 @@ namespace device
 		float *input_bins_n_meta1;
 		float *input_bins_n_meta2;
 
-		int output_persistence_map;
+		int *persistence_map;
 
 		__device__ __forceinline__ void
 		operator () () const
 		{
-//			unsigned int tid = threadIdx.y*blockDim.x+threadIdx.x;
-//			unsigned int gid = blockIdx.z*640*480+blockIdx.y*blockDim.x*blockDim.y+blockIdx.x*blockDim.x;
-
 			unsigned int tid = threadIdx.x;
+			unsigned int vid = blockIdx.y*blockDim.x*blockDim.y+blockIdx.x*blockDim.x+tid;
+			unsigned int gid = blockIdx.z*640*480+vid;
 
-			if( input_bins_n_meta1[blockIdx.z*640*480*bins_n_meta+bins*640*480+blockIdx.x+tid]>0 && input_bins_n_meta2[blockIdx.z*640*480*bins_n_meta+bins*640*480+blockIdx.x+tid]>0 )
+			int idx = -1;
+			if( input_bins_n_meta1[blockIdx.z*640*480*bins_n_meta+bins*640*480+vid]>0 && input_bins_n_meta2[blockIdx.z*640*480*bins_n_meta+bins*640*480+vid]>0 )
 			{
-				if( (input_div1[blockIdx.z*640*480+blockIdx.x*dx+tid] > beta * input_sigma1[blockIdx.z]) && (input_div2[blockIdx.z*640*480+blockIdx.x*dx+tid] > beta * input_sigma2[blockIdx.z]) )
+				if( (input_div1[gid] > beta * input_sigma1[blockIdx.z]) && (input_div2[gid] > beta * input_sigma2[blockIdx.z]) )
 				{
-
+					if(intersection)
+					{
+						if(persistence_map[gid] > 0)
+							idx = gid;
+					}
+					else
+						idx = gid;
 				}
 			}
+			persistence_map[gid] = idx;
 		}
 	};
+	__global__ void computePersistanceDFPFHFeatures(const PersistanceDFPFHEstimator pers){ pers(); }
 
-	struct PersistanceAllDFPFHEstimator : public DFPFHBaseKernel
+	struct PersistanceIntersectionDFPFHEstimator : public DFPFHBaseKernel
 	{
 		enum
 		{
@@ -883,6 +902,7 @@ device::MeanDFPFHEstimator<512> mean1;
 device::DivDFPFHEstimator div1;
 device::SigmaDFPFHBlock sigmaBlock1;
 device::SigmaDFPFH<512> sigma1;
+device::PersistanceDFPFHEstimator persistance;
 
 
 void
@@ -980,7 +1000,7 @@ DFPFHEstimator::execute()
 			if(data2[v*640*480*(dfpfhEstimator1.bins_n_meta)+sdpfhEstimator1.bins*640*480+i]!=0)
 			{
 
-				printf("(%d) ",i);
+				printf("(%d/%d) ",v,i);
 				for(int j=0;j<3;j++)
 				{
 					float sum = 0.f;
@@ -999,6 +1019,85 @@ DFPFHEstimator::execute()
 			}
 		}
 	}
+
+	blockMean1.input_bins = dfpfhEstimator1.output_bins;
+
+	thrust::device_vector<float> d_test_output((n_view*640*480)/blockMean1.dx * blockMean1.bins_n_meta);
+	blockMean1.output_block_mean = thrust::raw_pointer_cast(d_test_output.data());
+
+	dim3 meanPatchBlock(blockMean1.dx);
+	dim3 meanPatchGrid((640*480)/blockMean1.dx,1,n_view);
+	device::computeBlockMeanDFPFH<<<meanPatchGrid,meanPatchBlock>>>(blockMean1);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	thrust::host_vector<float> h_out_mean_dfpfh = d_test_output;
+	printf("dfpfh.size: %d meanGrid: %d \n",h_out_mean_dfpfh.size(),meanPatchGrid.x);
+
+	float *data3 = h_out_mean_dfpfh.data();
+//	printf("test: %f \n",data3[0]);
+	for(int v=0;v<n_view;v++)
+	{
+		for(int i=0;i<meanPatchGrid.x;i+=50)
+		{
+			if(data3[v*meanPatchGrid.x*(blockMean1.bins_n_meta)+blockMean1.bins*meanPatchGrid.x+i]>0)
+			{
+				bool wrong = false;
+//				printf("(%d/%d): ",v,i);
+				float sum = 0.f;
+					printf("(%d/%d): ",v,i);
+					for(int j=0;j<3;j++)
+					{
+						for(int h=0;h<11;h++)
+						{
+			//					printf("%f ",data[i*33+j*11+h]);
+							//TODO
+							float tmp;
+							printf("%f ",tmp=data3[v*meanPatchGrid.x*blockMean1.bins_n_meta+(j*11+h)*meanPatchGrid.x+i]);
+							sum +=tmp;
+						}
+						printf(" (sum: %f) || ",sum);
+						sum = 0.f;
+				}
+
+				printf("|| meta: %f \n",data3[v*meanPatchGrid.x*(blockMean1.bins_n_meta)+blockMean1.bins*meanPatchGrid.x+i]);
+
+			}
+		}
+	}
+
+	thrust::device_vector<float> d_outputMean(n_view*mean1.bins_n_meta);
+	mean1.output_block_mean = thrust::raw_pointer_cast(d_outputMean.data());
+
+	mean1.input_bins = blockMean1.output_block_mean;
+	mean1.length = meanPatchGrid.x;
+
+	dim3 meanGrid(1,1,n_view);
+	device::computeMeanDFPFH<<<meanGrid,mean1.dx>>>(mean1);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	thrust::host_vector<float> h_meanHisto = d_outputMean;
+	float *data4 = h_meanHisto.data();
+	for(int v=0;v<n_view;v++)
+	{
+		printf("mean: ");
+		float sum=0.f;
+		for(int i=0;i<mean1.bins_n_meta;i++)
+		{
+			if(i>0 && i%mean1.bins_per_feature==0)
+			{
+				printf("= %f ||",sum);
+				sum = 0;
+			}
+			float tmp;
+			printf(" %f",tmp=data4[v*mean1.bins_n_meta+i]);
+			sum += tmp;
+		}
+		printf("= %f \n",sum);
+
+	}
+
 
 }
 
@@ -1260,5 +1359,8 @@ DFPFHEstimator::TestDFPFHE()
 	device::computeSigmaDFPFH<<<n_view,sigma1.dx>>>(sigma1);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+//	thrust::device_vector<int> persistance_map(n_view*640*480);
+//	persistance.input_bins_n_meta1
 
 }

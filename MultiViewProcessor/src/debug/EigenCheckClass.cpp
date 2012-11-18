@@ -536,12 +536,12 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 //	Eigen::Matrix4f reTransform = Eigen::Matrix4f::Identity();
 	for(int v=0;v<n_view;v++)
 	{
-		printf("%d: ",v);
-		for(int tq=0;tq<7;tq++)
-		{
-			printf("%f |",in_quaternions[v*7+tq]);
-		}
-		printf("\n");
+//		printf("%d: ",v);
+//		for(int tq=0;tq<7;tq++)
+//		{
+//			printf("%f |",in_quaternions[v*7+tq]);
+//		}
+//		printf("\n");
 
 
 		Eigen::Quaternion<float> q(in_quaternions[v*7+6],in_quaternions[v*7+3],in_quaternions[v*7+4],in_quaternions[v*7+5]);
@@ -565,8 +565,8 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 		}
 
 		Eigen::Matrix3f r_out = rota.inverse();
-		std::cout << "r_out :\n" << r_out << std::endl;
-		std::cout << "v_out :\n" << v_out << std::endl;
+//		std::cout << "r_out :\n" << r_out << std::endl;
+//		std::cout << "v_out :\n" << v_out << std::endl;
 
 		for(int t=0;t<9;t++)
 		{
