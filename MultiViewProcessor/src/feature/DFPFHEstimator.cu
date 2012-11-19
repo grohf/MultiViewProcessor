@@ -592,16 +592,16 @@ namespace device
 	        unsigned int tid = threadIdx.x;
 	        unsigned int gridSize = dx*2*gridDim.x;
 
-	        if(tid==0)
-	        	printf("block: %d \n",blockIdx.z);
-
-	        if(blockIdx.z==1 & tid==0)
-	        {
-	        	for(int t=0;t<length;t+=50)
-	        	{
-		    			printf("inKernelCount(%d): %f \n",t,input_bins[blockIdx.z*length*bins_n_meta+bins*length+t]);
-	        	}
-	        }
+//	        if(tid==0)
+//	        	printf("block: %d \n",blockIdx.z);
+//
+//	        if(blockIdx.z==1 & tid==0)
+//	        {
+//	        	for(int t=0;t<length;t+=50)
+//	        	{
+//		    			printf("inKernelCount(%d): %f \n",t,input_bins[blockIdx.z*length*bins_n_meta+bins*length+t]);
+//	        	}
+//	        }
 
 	    	float sum = 0.f;
 	    	unsigned int i = blockIdx.x*dx*2 + tid;
@@ -632,8 +632,8 @@ namespace device
 
 	        unsigned int loops = (bins-1)/shared_lines +1;
 
-			if(threadIdx.x==0 && blockIdx.x==0)
-				printf("loops: %d \n",loops);
+//			if(threadIdx.x==0 && blockIdx.x==0)
+//				printf("loops: %d \n",loops);
 
 			for(int l=0;l<loops;l++)
 			{
@@ -678,6 +678,45 @@ namespace device
 		float *input_mean_bins;
 		float *output_div;
 
+		__device__  __forceinline__ float
+		klDivergence(float *feature, float *mean, unsigned int bins_count, unsigned int offset_feature, unsigned int offset_mean) const
+		{
+
+			float div = 0.f;
+			for(int i=0;i<bins_count;i++)
+			{
+				float p = feature[i*offset_feature];
+				float m = mean[i*offset_mean];
+
+				if(p/m>0)
+					div += (p - m) * __logf(p/m);
+			}
+
+			return div;
+		}
+
+		__device__  __forceinline__ float
+		klEuclideanDivergence(float *feature, float *mean, unsigned int feature_count, unsigned int bin_count_per_feature, unsigned int offset_feature, unsigned int offset_mean) const
+		{
+			float div = 0.f;
+
+			for(int f=0;f<feature_count;f++)
+			{
+				float tmpDiv = 0.f;
+				for(int i=0;i<bin_count_per_feature;i++)
+				{
+					float p = feature[(f*bin_count_per_feature+i)*offset_feature];
+					float m = mean[(f*bin_count_per_feature+i)*offset_mean];
+
+					if(p/m>0)
+						tmpDiv += (p - m) * __logf(p/m);
+				}
+				div += (tmpDiv * tmpDiv);
+			}
+
+			return sqrtf(div);
+		}
+
 		__device__ __forceinline__ void
 		operator () () const
 		{
@@ -692,28 +731,11 @@ namespace device
 
 			__syncthreads();
 
-//			if(blockIdx.x==0 && tid==0)
-//			{
-//				printf("mean inkernel: ");
-//				for(int l=0;l<bins_n_meta;l++)
-//					printf("%f ",shm_mean[l]);
-//			}
+//			float div = klDivergence(&input_dfpfh_bins[blockIdx.z*640*480*bins_n_meta+i],shm_mean,bins,640*480,1);
 
-			//TODO: Test euclidean over KL-div per feature
-			float div = 0.f;
-			for(int b=0;b<bins;b++)
-			{
-				float p = input_dfpfh_bins[blockIdx.z*640*480*bins_n_meta+b*640*480+i];
-				float m = shm_mean[b];
-				if(p/m > 0)
-					div += (p - m) * __logf(p/m);
-			}
+			float div = klEuclideanDivergence(&input_dfpfh_bins[blockIdx.z*640*480*bins_n_meta+i],shm_mean,features,bins_per_feature,640*480,1);
 			output_div[blockIdx.z*640*480+i] = div;
 
-//			if(blockIdx.x==150 && (tid==32 || tid==33) )
-//			{
-//				printf("\n %d -> %f \n",i,div);
-//			}
 		}
 
 	};
@@ -762,7 +784,7 @@ namespace device
 			__syncthreads();
 
 			if(tid==0)
-				output_div_block[blockIdx.x] = shm_buffer[0];
+				output_div_block[blockIdx.z*gridDim.x+blockIdx.x] = shm_buffer[0];
 
 //			if(tid==0)
 //				printf("sigBlock: %d -> %f \n",blockIdx.x,shm_buffer[0]);
@@ -812,7 +834,7 @@ namespace device
 			if(tid==0)
 			{
 				float points = input_mean_data[blockIdx.z*bins_n_meta+bins];
-				printf("points: %f sigma: %f \n",points,sqrtf(shm_buffer[0]/points));
+				printf("(%d) points: %f sigma: %f \n",blockIdx.z,points,sqrtf(shm_buffer[0]/points));
 				output_sigmas[blockIdx.z] = (points>0)?sqrtf(shm_buffer[0]/points):-1.f;
 			}
 
@@ -892,51 +914,124 @@ namespace device
 		}
 
 	};
+
+	struct PersistanceMapLength
+	{
+		enum
+		{
+			dx = 1024,
+		};
+
+		int *input_persistanceMap;
+		unsigned int *output_persistanceMapLenth;
+
+		unsigned int length;
+
+		__device__ __forceinline__ void
+		operator () () const
+		{
+			unsigned int i = blockIdx.x*blockDim.x+threadIdx.x;
+
+			if(i+1>length)
+			{
+				return;
+			}
+
+			unsigned int v1 = input_persistanceMap[i];
+			v1 /= (640*480);
+
+			if(i+1==length)
+			{
+				output_persistanceMapLenth[v1] = i+1;
+				return;
+			}
+
+			unsigned int v2 = input_persistanceMap[i+1];
+			v2 /= (640*480);
+
+			if(v2>v1)
+				output_persistanceMapLenth[v1] = i+1;
+		}
+	};
+	__global__ void computePersistanceMapLength(const PersistanceMapLength mapLength){ mapLength(); }
+
 }
 
 
-device::SDPFHEstimator sdpfhEstimator1;
-device::DFPFHEstimator dfpfhEstimator1;
-device::MeanDFPFHBlockEstimator blockMean1;
+device::SDPFHEstimator sdpfh1;
+device::SDPFHEstimator sdpfh2;
+
+device::DFPFHEstimator dfpfh1;
+device::DFPFHEstimator dfpfh2;
+
+
+device::MeanDFPFHBlockEstimator meanBlock1;
+device::MeanDFPFHBlockEstimator meanBlock2;
+
 device::MeanDFPFHEstimator<512> mean1;
+device::MeanDFPFHEstimator<512> mean2;
+
+
 device::DivDFPFHEstimator div1;
+device::DivDFPFHEstimator div2;
+
 device::SigmaDFPFHBlock sigmaBlock1;
+device::SigmaDFPFHBlock sigmaBlock2;
+
 device::SigmaDFPFH<512> sigma1;
+device::SigmaDFPFH<512> sigma2;
+
 device::PersistanceDFPFHEstimator persistance;
 
 
 void
 DFPFHEstimator::init()
 {
-	sdpfhEstimator1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
-	sdpfhEstimator1.input_normals = (float4 *)getInputDataPointer(PointNormal);
-	sdpfhEstimator1.output_bins = (float *)getTargetDataPointer(SDPFHistogram1);
+	sdpfh1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+	sdpfh1.input_normals = (float4 *)getInputDataPointer(PointNormal);
+//	sdpfh1.output_bins = (float *)getTargetDataPointer(SDPFHistogram1);
 
-	dfpfhEstimator1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
-	dfpfhEstimator1.input_bins_sdfpfh = (float *)getTargetDataPointer(SDPFHistogram1);
-	dfpfhEstimator1.output_bins = (float *)getTargetDataPointer(DFPFHistogram1);
+	sdpfh2.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+	sdpfh2.input_normals = (float4 *)getInputDataPointer(PointNormal);
+
+	dfpfh1.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+	dfpfh2.input_pos = (float4 *)getInputDataPointer(PointCoordinates);
+
+//	dfpfh1.input_bins_sdfpfh = (float *)getTargetDataPointer(SDPFHistogram1);
+//	dfpfh1.output_bins = (float *)getTargetDataPointer(DFPFHistogram1);
 }
 
 
 void
 DFPFHEstimator::execute()
 {
+	float radii[3] = {10.f,15.f,20.f};
+
+	thrust::device_vector<float> d_sdpfh1(n_view*640*480*sdpfh1.bins_n_meta);
+	thrust::device_vector<float> d_sdpfh2(n_view*640*480*sdpfh2.bins_n_meta);
+
+//	sdpfh1.view = 0;
+	sdpfh1.radius = 10.0f;
+	sdpfh1.invalidToNormalPointRatio = 0.5;
+	sdpfh1.output_bins = thrust::raw_pointer_cast(d_sdpfh1.data());
+
+	sdpfh2.radius = 15.0f;
+	sdpfh2.invalidToNormalPointRatio = 0.5;
+	sdpfh2.output_bins = thrust::raw_pointer_cast(d_sdpfh2.data());
 
 
-	printf("I'm in! \n");
-	sdpfhEstimator1.view = 0;
-	sdpfhEstimator1.radius = 15.0f;
-	sdpfhEstimator1.invalidToNormalPointRatio = 0.5;
-
-	dim3 block(sdpfhEstimator1.dx);
-	dim3 grid(640*480/sdpfhEstimator1.points_per_block,1,n_view);
-	device::computeSDPFH<<<grid,block>>>(sdpfhEstimator1);
+	dim3 block(sdpfh1.dx);
+	dim3 grid(640*480/sdpfh1.points_per_block,1,n_view);
+	device::computeSDPFH<<<grid,block>>>(sdpfh1);
+	device::computeSDPFH<<<grid,block>>>(sdpfh2);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	thrust::device_ptr<float> dptr = thrust::device_pointer_cast(sdpfhEstimator1.output_bins);
-	thrust::device_vector<float> d_out_histo(dptr,dptr+n_view*640*480*(sdpfhEstimator1.bins_n_meta));
-	thrust::host_vector<float> h_out_histo = d_out_histo;
+//	thrust::device_ptr<float> dptr = thrust::device_pointer_cast(sdpfh1.output_bins);
+//	thrust::device_vector<float> d_out_histo(dptr,dptr+n_view*640*480*(sdpfh1.bins_n_meta));
+
+
+	thrust::host_vector<float> h_out_histo = d_sdpfh1;
 
 	printf("size: %d \n",h_out_histo.size());
 
@@ -963,142 +1058,372 @@ DFPFHEstimator::execute()
 //		}
 //	}
 
-	for(int v=0;v<n_view;v++)
-	{
-		for(int i=0;i<640*480;i+=10000)
-		{
-			if(data[v*640*480*(sdpfhEstimator1.bins_n_meta)+sdpfhEstimator1.bins*640*480+i]!=0)
-			{
-				printf("(%d) ",i);
-				for(int j=0;j<3;j++)
-				{
-					for(int h=0;h<11;h++)
-					{
-						printf("%f ",data[v*640*480*(sdpfhEstimator1.bins_n_meta)+(j*11+h)*640*480+i]);
-					}
-					printf(" || ");
-				}
-				printf("\n");
-			}
-		}
-	}
+//	for(int v=0;v<n_view;v++)
+//	{
+//		for(int i=0;i<640*480;i+=10000)
+//		{
+//			if(data[v*640*480*(sdpfh1.bins_n_meta)+sdpfh1.bins*640*480+i]!=0)
+//			{
+//				printf("(%d) ",i);
+//				for(int j=0;j<3;j++)
+//				{
+//					for(int h=0;h<11;h++)
+//					{
+//						printf("%f ",data[v*640*480*(sdpfh1.bins_n_meta)+(j*11+h)*640*480+i]);
+//					}
+//					printf(" || ");
+//				}
+//				printf("\n");
+//			}
+//		}
+//	}
 
-	dfpfhEstimator1.radius = 15.f;
-	dfpfhEstimator1.maxReconstructuionLevel = 0;
-	device::computeDFPFH<<<grid,block>>>(dfpfhEstimator1);
+	thrust::device_vector<float> d_dfpfh1(n_view*640*480*dfpfh1.bins_n_meta);
+	thrust::device_vector<float> d_dfpfh2(n_view*640*480*sdpfh2.bins_n_meta);
+
+	dfpfh1.radius = 10.f;
+	dfpfh1.maxReconstructuionLevel = 0;
+	dfpfh1.input_bins_sdfpfh = sdpfh1.output_bins;
+	dfpfh1.output_bins = thrust::raw_pointer_cast(d_dfpfh1.data());
+
+	dfpfh2.radius = 15.f;
+	dfpfh2.maxReconstructuionLevel = 0;
+	dfpfh2.input_bins_sdfpfh = sdpfh2.output_bins;
+	dfpfh2.output_bins = thrust::raw_pointer_cast(d_dfpfh2.data());
+
+
+	device::computeDFPFH<<<grid,block>>>(dfpfh1);
+	device::computeDFPFH<<<grid,block>>>(dfpfh2);
+
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	thrust::device_ptr<float> dptr2 = thrust::device_pointer_cast(dfpfhEstimator1.output_bins);
-	thrust::device_vector<float> d_out_histo2(dptr2,dptr2+n_view*640*480*(dfpfhEstimator1.bins_n_meta));
-	thrust::host_vector<float> h_out_histo2 = d_out_histo2;
-	float *data2 = h_out_histo2.data();
-	for(int v=0;v<n_view;v++)
-	{
-		for(int i=0;i<640*480;i+=10000)
-		{
-			if(data2[v*640*480*(dfpfhEstimator1.bins_n_meta)+sdpfhEstimator1.bins*640*480+i]!=0)
-			{
+//	thrust::device_ptr<float> dptr2 = thrust::device_pointer_cast(dfpfh1.output_bins);
+//	thrust::device_vector<float> d_out_histo2(dptr2,dptr2+n_view*640*480*(dfpfh1.bins_n_meta));
+//	thrust::host_vector<float> h_out_histo2 = d_out_histo2;
+//	float *data2 = h_out_histo2.data();
+//	for(int v=0;v<n_view;v++)
+//	{
+//		for(int i=0;i<640*480;i+=10000)
+//		{
+//			if(data2[v*640*480*(dfpfh1.bins_n_meta)+sdpfh1.bins*640*480+i]!=0)
+//			{
+//
+//				printf("(%d/%d) ",v,i);
+//				for(int j=0;j<3;j++)
+//				{
+//					float sum = 0.f;
+//					for(int h=0;h<11;h++)
+//					{
+//		//					printf("%f ",data[i*33+j*11+h]);
+//						//TODO
+//						float tmp;
+//						printf("%f ",(tmp=data2[v*640*480*(dfpfh1.bins_n_meta)+(j*11+h)*640*480+i]));
+//						sum += tmp;
+//					}
+//					printf(" (sum: %f) || ",sum);
+//				}
+//
+//				printf("|| meta: %f \n",data2[v*640*480*(dfpfh1.bins_n_meta)+dfpfh1.bins*640*480+i]);
+//			}
+//		}
+//	}
 
-				printf("(%d/%d) ",v,i);
-				for(int j=0;j<3;j++)
-				{
-					float sum = 0.f;
-					for(int h=0;h<11;h++)
-					{
-		//					printf("%f ",data[i*33+j*11+h]);
-						//TODO
-						float tmp;
-						printf("%f ",(tmp=data2[v*640*480*(dfpfhEstimator1.bins_n_meta)+(j*11+h)*640*480+i]));
-						sum += tmp;
-					}
-					printf(" (sum: %f) || ",sum);
-				}
+	thrust::device_vector<float> d_mean_block1((n_view*640*480)/meanBlock1.dx * meanBlock1.bins_n_meta);
+	thrust::device_vector<float> d_mean_block2((n_view*640*480)/meanBlock2.dx * meanBlock2.bins_n_meta);
 
-				printf("|| meta: %f \n",data2[v*640*480*(dfpfhEstimator1.bins_n_meta)+dfpfhEstimator1.bins*640*480+i]);
-			}
-		}
-	}
+	meanBlock1.input_bins = dfpfh1.output_bins;
+	meanBlock1.output_block_mean = thrust::raw_pointer_cast(d_mean_block1.data());
 
-	blockMean1.input_bins = dfpfhEstimator1.output_bins;
+	meanBlock2.input_bins = dfpfh2.output_bins;
+	meanBlock2.output_block_mean = thrust::raw_pointer_cast(d_mean_block2.data());
 
-	thrust::device_vector<float> d_test_output((n_view*640*480)/blockMean1.dx * blockMean1.bins_n_meta);
-	blockMean1.output_block_mean = thrust::raw_pointer_cast(d_test_output.data());
-
-	dim3 meanPatchBlock(blockMean1.dx);
-	dim3 meanPatchGrid((640*480)/blockMean1.dx,1,n_view);
-	device::computeBlockMeanDFPFH<<<meanPatchGrid,meanPatchBlock>>>(blockMean1);
+	dim3 meanPatchBlock(meanBlock1.dx);
+	dim3 meanPatchGrid((640*480)/meanBlock1.dx,1,n_view);
+	device::computeBlockMeanDFPFH<<<meanPatchGrid,meanPatchBlock>>>(meanBlock1);
+	device::computeBlockMeanDFPFH<<<meanPatchGrid,meanPatchBlock>>>(meanBlock2);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	thrust::host_vector<float> h_out_mean_dfpfh = d_test_output;
-	printf("dfpfh.size: %d meanGrid: %d \n",h_out_mean_dfpfh.size(),meanPatchGrid.x);
+//	thrust::host_vector<float> h_out_mean_dfpfh = d_mean_block1;
+//	printf("dfpfh.size: %d meanGrid: %d \n",h_out_mean_dfpfh.size(),meanPatchGrid.x);
+//
+//	float *data3 = h_out_mean_dfpfh.data();
+////	printf("test: %f \n",data3[0]);
+//	for(int v=0;v<n_view;v++)
+//	{
+//		for(int i=0;i<meanPatchGrid.x;i+=50)
+//		{
+//			if(data3[v*meanPatchGrid.x*(meanBlock1.bins_n_meta)+meanBlock1.bins*meanPatchGrid.x+i]>0)
+//			{
+//				bool wrong = false;
+////				printf("(%d/%d): ",v,i);
+//				float sum = 0.f;
+//					printf("(%d/%d): ",v,i);
+//					for(int j=0;j<3;j++)
+//					{
+//						for(int h=0;h<11;h++)
+//						{
+//			//					printf("%f ",data[i*33+j*11+h]);
+//							//TODO
+//							float tmp;
+//							printf("%f ",tmp=data3[v*meanPatchGrid.x*meanBlock1.bins_n_meta+(j*11+h)*meanPatchGrid.x+i]);
+//							sum +=tmp;
+//						}
+//						printf(" (sum: %f) || ",sum);
+//						sum = 0.f;
+//				}
+//
+//				printf("|| meta: %f \n",data3[v*meanPatchGrid.x*(meanBlock1.bins_n_meta)+meanBlock1.bins*meanPatchGrid.x+i]);
+//
+//			}
+//		}
+//	}
 
-	float *data3 = h_out_mean_dfpfh.data();
-//	printf("test: %f \n",data3[0]);
-	for(int v=0;v<n_view;v++)
-	{
-		for(int i=0;i<meanPatchGrid.x;i+=50)
-		{
-			if(data3[v*meanPatchGrid.x*(blockMean1.bins_n_meta)+blockMean1.bins*meanPatchGrid.x+i]>0)
-			{
-				bool wrong = false;
-//				printf("(%d/%d): ",v,i);
-				float sum = 0.f;
-					printf("(%d/%d): ",v,i);
-					for(int j=0;j<3;j++)
-					{
-						for(int h=0;h<11;h++)
-						{
-			//					printf("%f ",data[i*33+j*11+h]);
-							//TODO
-							float tmp;
-							printf("%f ",tmp=data3[v*meanPatchGrid.x*blockMean1.bins_n_meta+(j*11+h)*meanPatchGrid.x+i]);
-							sum +=tmp;
-						}
-						printf(" (sum: %f) || ",sum);
-						sum = 0.f;
-				}
+	thrust::device_vector<float> d_mean1(n_view*mean1.bins_n_meta);
+	thrust::device_vector<float> d_mean2(n_view*mean2.bins_n_meta);
 
-				printf("|| meta: %f \n",data3[v*meanPatchGrid.x*(blockMean1.bins_n_meta)+blockMean1.bins*meanPatchGrid.x+i]);
-
-			}
-		}
-	}
-
-	thrust::device_vector<float> d_outputMean(n_view*mean1.bins_n_meta);
-	mean1.output_block_mean = thrust::raw_pointer_cast(d_outputMean.data());
-
-	mean1.input_bins = blockMean1.output_block_mean;
+	mean1.input_bins = meanBlock1.output_block_mean;
 	mean1.length = meanPatchGrid.x;
+	mean1.output_block_mean = thrust::raw_pointer_cast(d_mean1.data());
+
+	mean2.input_bins = meanBlock2.output_block_mean;
+	mean2.length = meanPatchGrid.x;
+	mean2.output_block_mean = thrust::raw_pointer_cast(d_mean2.data());
+
 
 	dim3 meanGrid(1,1,n_view);
 	device::computeMeanDFPFH<<<meanGrid,mean1.dx>>>(mean1);
+	device::computeMeanDFPFH<<<meanGrid,mean2.dx>>>(mean2);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	thrust::host_vector<float> h_meanHisto = d_outputMean;
-	float *data4 = h_meanHisto.data();
-	for(int v=0;v<n_view;v++)
-	{
-		printf("mean: ");
-		float sum=0.f;
-		for(int i=0;i<mean1.bins_n_meta;i++)
-		{
-			if(i>0 && i%mean1.bins_per_feature==0)
-			{
-				printf("= %f ||",sum);
-				sum = 0;
-			}
-			float tmp;
-			printf(" %f",tmp=data4[v*mean1.bins_n_meta+i]);
-			sum += tmp;
-		}
-		printf("= %f \n",sum);
 
+//	thrust::host_vector<float> h_meanHisto = d_mean1;
+//	float *data4 = h_meanHisto.data();
+//	for(int v=0;v<n_view;v++)
+//	{
+//		printf("mean: ");
+//		float sum=0.f;
+//		for(int i=0;i<mean1.bins_n_meta;i++)
+//		{
+//			if(i>0 && i%mean1.bins_per_feature==0)
+//			{
+//				printf("= %f ||",sum);
+//				sum = 0;
+//			}
+//			float tmp;
+//			printf(" %f",tmp=data4[v*mean1.bins_n_meta+i]);
+//			sum += tmp;
+//		}
+//		printf("= %f \n",sum);
+//
+//	}
+
+
+
+	thrust::device_vector<float> d_div1(n_view*640*480);
+	thrust::device_vector<float> d_div2(n_view*640*480);
+
+	div1.input_dfpfh_bins = dfpfh1.output_bins;
+	div1.input_mean_bins = mean1.output_block_mean;
+	div1.output_div = thrust::raw_pointer_cast(d_div1.data());
+
+	div2.input_dfpfh_bins = dfpfh2.output_bins;
+	div2.input_mean_bins = mean2.output_block_mean;
+	div2.output_div = thrust::raw_pointer_cast(d_div2.data());
+
+
+	dim3 divGrid((640*480)/div1.dx,1,n_view);
+	device::computeDivDFPFH<<<divGrid,div1.dx>>>(div1);
+	device::computeDivDFPFH<<<divGrid,div2.dx>>>(div2);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+//	thrust::host_vector<float> h_div = d_div1;
+//	float *data5 = h_div.data();
+////	printf("test: %f \n",data3[0]);
+//	for(int v=0;v<n_view;v++)
+//	{
+//		for(int i=0;i<640*480;i+=10000)
+//		{
+//			if(data[v*640*480*(sdpfh1.bins_n_meta)+sdpfh1.bins*640*480+i]!=0)
+//			{
+//				printf("(%d/%d) div: %f \n",v,i,data5[v*640*480+i]);
+//			}
+//		}
+//	}
+
+	thrust::device_vector<float> d_sigma_block1(n_view*(640*480)/sigmaBlock1.dx);
+	thrust::device_vector<float> d_sigma_block2(n_view*(640*480)/sigmaBlock2.dx);
+
+	sigmaBlock1.input_div = div1.output_div;
+	sigmaBlock1.output_div_block = thrust::raw_pointer_cast(d_sigma_block1.data());
+	sigmaBlock1.length = 640*480;
+
+	sigmaBlock2.input_div = div2.output_div;
+	sigmaBlock2.output_div_block = thrust::raw_pointer_cast(d_sigma_block2.data());
+	sigmaBlock2.length = 640*480;
+
+
+//	dim3 sigBlock((640*480)/sigma1.dx);
+	dim3 sigGrid((640*480)/(sigmaBlock1.dx*2),1,n_view);
+//	dim3 sigGrid(128,1,n_view);
+	device::computeSigmaDFPFHBlock<<<sigGrid,sigmaBlock1.dx>>>(sigmaBlock1);
+	device::computeSigmaDFPFHBlock<<<sigGrid,sigmaBlock1.dx>>>(sigmaBlock2);
+	
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+//	thrust::host_vector<float> h_sigma_block = d_sigma_block1;
+//	float *data6 = h_sigma_block.data();
+//
+//	for(int v=0;v<n_view;v++)
+//		{
+//			for(int i=0;i<sigGrid.x;i+=50)
+//			{
+////				if(data6[v*sigGrid.x*(blockMean1.bins_n_meta)+meanBlock1.bins*sigGrid.x+i]>0)
+////				{
+//
+//				printf("(%d/%d) divBlockSum: %f \n",v,i,data6[v*sigGrid.x+i]);
+//
+////				}
+//			}
+//		}
+
+
+	thrust::device_vector<float> d_sigma1(n_view);
+	thrust::device_vector<float> d_sigma2(n_view);
+
+	sigma1.input_sig_block = sigmaBlock1.output_div_block;
+	sigma1.input_mean_data = mean1.output_block_mean;
+	sigma1.output_sigmas = thrust::raw_pointer_cast(d_sigma1.data());
+	sigma1.length = sigGrid.x;
+
+	sigma2.input_sig_block = sigmaBlock2.output_div_block;
+	sigma2.input_mean_data = mean2.output_block_mean;
+	sigma2.output_sigmas = thrust::raw_pointer_cast(d_sigma2.data());
+	sigma2.length = sigGrid.x;
+
+
+	device::computeSigmaDFPFH<<<dim3(1,1,n_view),sigma1.dx>>>(sigma1);
+	device::computeSigmaDFPFH<<<dim3(1,1,n_view),sigma2.dx>>>(sigma2);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+
+	thrust::device_vector<int> d_persistance_map(n_view*640*480);
+
+	persistance.input_div1 = div1.output_div;
+	persistance.input_div2 = div2.output_div;
+
+	persistance.input_sigma1 = sigma1.output_sigmas;
+	persistance.input_sigma2 = sigma2.output_sigmas;
+
+	persistance.input_bins_n_meta1 = dfpfh1.output_bins;
+	persistance.input_bins_n_meta2 = dfpfh2.output_bins;
+
+	persistance.persistence_map = thrust::raw_pointer_cast(d_persistance_map.data());
+
+	persistance.beta = 1.f;
+	persistance.intersection = false;
+
+
+	device::computePersistanceDFPFHFeatures<<<dim3((640*480)/persistance.dx,1,n_view),persistance.dx>>>(persistance);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	thrust::host_vector<int> h_persistance_map = d_persistance_map;
+	thrust::device_ptr<int> last = thrust::remove(d_persistance_map.data(),d_persistance_map.data()+d_persistance_map.size(),-1);
+	thrust::device_vector<int> d_clearedPersiatnceMap(d_persistance_map.data(),last);
+
+	thrust::device_vector<unsigned int> d_persistanceMapLength(n_view);
+
+	printf("d_clearedPersiatnceMap.size(): %d \n",d_clearedPersiatnceMap.size());
+
+	device::PersistanceMapLength mapLength;
+	mapLength.input_persistanceMap = thrust::raw_pointer_cast(d_clearedPersiatnceMap.data());
+	mapLength.output_persistanceMapLenth = thrust::raw_pointer_cast(d_persistanceMapLength.data());
+	mapLength.length = d_clearedPersiatnceMap.size();
+	device::computePersistanceMapLength<<< ((d_clearedPersiatnceMap.size()-1)/mapLength.dx+1),mapLength.dx >>>(mapLength);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	thrust::host_vector<unsigned int> h_persistanceMapLength = d_persistanceMapLength;
+	for(int l=0;l<h_persistanceMapLength.size();l++)
+	{
+		int length = h_persistanceMapLength.data()[l];
+		printf("%d -> %d \n",l,length);
+	}
+
+	thrust::host_vector<int> h_clearedPersiatnceMap = d_clearedPersiatnceMap;
+	int *dataLength = h_clearedPersiatnceMap.data();
+	int lidx = h_persistanceMapLength.data()[0];
+	printf("%d %d %d \n",dataLength[lidx-1]/(640*480),dataLength[lidx]/(640*480),dataLength[lidx+1]/(640*480));
+
+
+	char path[50];
+	bool output = false;
+	if(output)
+	{
+		thrust::host_vector<int> h_persistance_map = d_persistance_map;
+
+		thrust::device_ptr<int> last = thrust::remove(d_persistance_map.data(),d_persistance_map.data()+d_persistance_map.size(),-1);
+
+//		int length_pMap = last - d_persistance_map.data();
+//		printf("length pMap: %d \n",length_pMap);
+
+		thrust::device_vector<int> d_clearedPersiatnceMap(d_persistance_map.data(),last);
+		thrust::host_vector<int> h_clearedPersiatnceMap = d_clearedPersiatnceMap;
+		printf("d_clearedPersiatnceMap.size(): %d \n",h_clearedPersiatnceMap.size());
+
+
+		thrust::device_ptr<float4> dptr = thrust::device_pointer_cast(dfpfh1.input_pos);
+		thrust::device_vector<float4> d_pos(dptr,dptr+n_view*640*480);
+		thrust::host_vector<float4> h_pos = d_pos;
+
+
+		float4 *pos = h_pos.data();
+		int *persistance_map = h_persistance_map.data();
+		uchar4 *h_map = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		int *clearedData = h_clearedPersiatnceMap.data();
+
+		for(int v=0;v<n_view;v++)
+		{
+			for(int i=0;i<640*480;i++)
+			{
+				unsigned char g = (pos[v*640*480+i].z/10000.f)*255.f;
+				if(persistance_map[v*640*480+i]>=0)
+				{
+					if(persistance_map[v*640*480+i]!=v*640*480+i)
+						printf("%d != %d \n",persistance_map[v*640*480+i],v*640*480+i);
+
+					g=255;
+				}
+				h_map[i] = make_uchar4(g,g,g,128);
+			}
+
+			for(int i=0;i<h_clearedPersiatnceMap.size();i++)
+			{
+				int idx = clearedData[i];
+				if(idx >= 0)
+				{
+					unsigned int vi = idx/(640*480);
+					if(vi==v)
+						h_map[idx-v*640*480] = make_uchar4(255,0,0,128);
+				}
+				else
+					printf("oOOOO \n");
+			}
+
+			sprintf(path,"/home/avo/pcds/persistance_r0_r1%d.ppm",v);
+			sdkSavePPM4ub(path,(unsigned char*)h_map,640,480);
+
+		}
 	}
 
 
+	printf("done! \n");
 }
 
 
@@ -1107,7 +1432,7 @@ DFPFHEstimator::DFPFHEstimator(unsigned int n_view): n_view(n_view)
 {
 	DeviceDataParams params;
 	params.elements = 640*480*n_view;
-	params.element_size = (sdpfhEstimator1.bins_n_meta) * sizeof(float);
+	params.element_size = (sdpfh1.bins_n_meta) * sizeof(float);
 	params.elementType = FLOAT1;
 	params.dataType = Histogramm;
 
@@ -1148,19 +1473,19 @@ DFPFHEstimator::TestDFPFHE()
 
 	thrust::device_vector<float4> d_inp_pos = h_inp_pos;
 	thrust::device_vector<float4> d_inp_normal = h_inp_normals;
-	thrust::device_vector<float> d_dspfph(n_view*640*480*sdpfhEstimator1.bins_n_meta);
+	thrust::device_vector<float> d_dspfph(n_view*640*480*sdpfh1.bins_n_meta);
 
-	sdpfhEstimator1.input_pos = thrust::raw_pointer_cast(d_inp_pos.data());
-	sdpfhEstimator1.input_normals = thrust::raw_pointer_cast(d_inp_normal.data());
-	sdpfhEstimator1.output_bins = thrust::raw_pointer_cast(d_dspfph.data());
-	sdpfhEstimator1.view = 0;
-	sdpfhEstimator1.radius = 15.0f;
-	sdpfhEstimator1.invalidToNormalPointRatio = 0.5;
+	sdpfh1.input_pos = thrust::raw_pointer_cast(d_inp_pos.data());
+	sdpfh1.input_normals = thrust::raw_pointer_cast(d_inp_normal.data());
+	sdpfh1.output_bins = thrust::raw_pointer_cast(d_dspfph.data());
+	sdpfh1.view = 0;
+	sdpfh1.radius = 15.0f;
+	sdpfh1.invalidToNormalPointRatio = 0.5;
 
 	printf("dspdf \n");
-	dim3 block(sdpfhEstimator1.dx);
-	dim3 grid(640*480/sdpfhEstimator1.points_per_block,1,1);
-	device::computeSDPFH<<<grid,block>>>(sdpfhEstimator1);
+	dim3 block(sdpfh1.dx);
+	dim3 grid(640*480/sdpfh1.points_per_block,1,1);
+	device::computeSDPFH<<<grid,block>>>(sdpfh1);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -1185,16 +1510,16 @@ DFPFHEstimator::TestDFPFHE()
 //		}
 //	}
 
-	thrust::device_vector<float> d_dfpfh(n_view*640*480*dfpfhEstimator1.bins_n_meta);
+	thrust::device_vector<float> d_dfpfh(n_view*640*480*dfpfh1.bins_n_meta);
 
-	dfpfhEstimator1.input_pos = thrust::raw_pointer_cast(d_inp_pos.data());
-	dfpfhEstimator1.input_bins_sdfpfh = thrust::raw_pointer_cast(d_dspfph.data());
-	dfpfhEstimator1.output_bins = thrust::raw_pointer_cast(d_dfpfh.data());
-	dfpfhEstimator1.radius = 15.f;
-	dfpfhEstimator1.maxReconstructuionLevel = 0;
+	dfpfh1.input_pos = thrust::raw_pointer_cast(d_inp_pos.data());
+	dfpfh1.input_bins_sdfpfh = thrust::raw_pointer_cast(d_dspfph.data());
+	dfpfh1.output_bins = thrust::raw_pointer_cast(d_dfpfh.data());
+	dfpfh1.radius = 15.f;
+	dfpfh1.maxReconstructuionLevel = 0;
 
 	printf("dfpdf \n");
-	device::computeDFPFH<<<grid,block>>>(dfpfhEstimator1);
+	device::computeDFPFH<<<grid,block>>>(dfpfh1);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -1244,13 +1569,13 @@ DFPFHEstimator::TestDFPFHE()
 				{
 	//					printf("%f ",data[i*33+j*11+h]);
 					//TODO
-					printf("%f ",data[v*640*480*(sdpfhEstimator1.bins_n_meta)+(j*11+h)*640*480+i]);
+					printf("%f ",data[v*640*480*(sdpfh1.bins_n_meta)+(j*11+h)*640*480+i]);
 
 				}
 				printf(" || ");
 			}
 
-			printf("|| meta: %f \n",data[v*640*480*(sdpfhEstimator1.bins_n_meta)+sdpfhEstimator1.bins*640*480+i]);
+			printf("|| meta: %f \n",data[v*640*480*(sdpfh1.bins_n_meta)+sdpfh1.bins*640*480+i]);
 		}
 	}
 
@@ -1266,14 +1591,14 @@ DFPFHEstimator::TestDFPFHE()
 //
 //	thrust::device_vector<float> d_test_dfpfh = h_test_dfpfh;
 //	blockMean1.input_bins = thrust::raw_pointer_cast(d_test_dfpfh.data());
-	blockMean1.input_bins = dfpfhEstimator1.output_bins;
+	meanBlock1.input_bins = dfpfh1.output_bins;
 
-	thrust::device_vector<float> d_test_output((640*480)/blockMean1.dx * blockMean1.bins_n_meta);
-	blockMean1.output_block_mean = thrust::raw_pointer_cast(d_test_output.data());
+	thrust::device_vector<float> d_test_output((640*480)/meanBlock1.dx * meanBlock1.bins_n_meta);
+	meanBlock1.output_block_mean = thrust::raw_pointer_cast(d_test_output.data());
 
-	dim3 meanBlock(blockMean1.dx);
-	dim3 meanGrid(640*480/blockMean1.dx,1,n_view);
-	device::computeBlockMeanDFPFH<<<meanGrid,meanBlock>>>(blockMean1);
+	dim3 meanBlock(meanBlock1.dx);
+	dim3 meanGrid(640*480/meanBlock1.dx,1,n_view);
+	device::computeBlockMeanDFPFH<<<meanGrid,meanBlock>>>(meanBlock1);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -1293,13 +1618,13 @@ DFPFHEstimator::TestDFPFHE()
 				{
 	//					printf("%f ",data[i*33+j*11+h]);
 					//TODO
-					printf("%f ",data3[v*meanGrid.x*blockMean1.bins_n_meta+(j*11+h)*meanGrid.x+i]);
+					printf("%f ",data3[v*meanGrid.x*meanBlock1.bins_n_meta+(j*11+h)*meanGrid.x+i]);
 
 				}
 				printf(" || ");
 			}
 
-			printf("|| meta: %f \n",data3[v*meanGrid.x*(blockMean1.bins_n_meta)+blockMean1.bins*meanGrid.x+i]);
+			printf("|| meta: %f \n",data3[v*meanGrid.x*(meanBlock1.bins_n_meta)+meanBlock1.bins*meanGrid.x+i]);
 		}
 	}
 
@@ -1307,7 +1632,7 @@ DFPFHEstimator::TestDFPFHE()
 	thrust::device_vector<float> d_outputMean(n_view*mean1.bins_n_meta);
 	mean1.output_block_mean = thrust::raw_pointer_cast(d_outputMean.data());
 
-	mean1.input_bins = blockMean1.output_block_mean;
+	mean1.input_bins = meanBlock1.output_block_mean;
 	mean1.length = meanGrid.x;
 
 	device::computeMeanDFPFH<<<n_view,mean1.dx>>>(mean1);
@@ -1331,7 +1656,7 @@ DFPFHEstimator::TestDFPFHE()
 	}
 
 	thrust::device_vector<float> d_div(n_view*640*480);
-	div1.input_dfpfh_bins = dfpfhEstimator1.output_bins;
+	div1.input_dfpfh_bins = dfpfh1.output_bins;
 	div1.input_mean_bins = mean1.output_block_mean;
 	div1.output_div = thrust::raw_pointer_cast(d_div.data());
 	device::computeDivDFPFH<<<((640*480)/div1.dx),div1.dx>>>(div1);
@@ -1359,6 +1684,8 @@ DFPFHEstimator::TestDFPFHE()
 	device::computeSigmaDFPFH<<<n_view,sigma1.dx>>>(sigma1);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+
 
 //	thrust::device_vector<int> persistance_map(n_view*640*480);
 //	persistance.input_bins_n_meta1

@@ -135,9 +135,10 @@
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 			<storageModule moduleId="com.nvidia.cuda.ide.build.project.ICudaProjectConfiguration">
 				<executable devicelink="true">
-					<sass major="2" minor="0"/>
 					<ptx major="2" minor="0"/>
+					<sass major="3" minor="0"/>
 				</executable>
+				<editor-arch major="3" minor="0"/>
 			</storageModule>
 		</cconfiguration>
 		<cconfiguration id="com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023">
@@ -228,10 +229,10 @@
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.c.1446234031">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.cpp.1591562129">
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cu.279360062">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cu.279360062">
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.cpp.1591562129">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.c.993397056">
