@@ -11,6 +11,7 @@
 namespace device
 {
 
+
 template<unsigned int blockSize, typename T>
 __device__ __forceinline__ void reduceBlock(T* shm)
 {
@@ -77,6 +78,62 @@ __device__ __forceinline__ void reduceBlockNoReg(T* shm,int lines)
 		  if (blockSize >=   2) { for(int i=0;i<lines;i++){ smem[i*blockSize + tid] += smem[i*blockSize + tid +  1]; } 	}
 	  }
 }
+
+
+template<class It>
+__device__ __forceinline__ float3 fetch(It ptr, int index)
+{
+    //return tr(ptr[index]);
+    return *(float3*)&ptr[index];
+}
+
+template<class It>
+__device__ __forceinline__ float3 fetch(It &ptr)
+{
+    //return tr(ptr[index]);
+    return *(float3*)&ptr;
+}
+
+
+__device__  __forceinline__ float
+klDivergence(float *feature, float *mean, unsigned int bins_count, unsigned int offset_feature, unsigned int offset_mean)
+{
+
+	float div = 0.f;
+	for(int i=0;i<bins_count;i++)
+	{
+		float p = feature[i*offset_feature];
+		float m = mean[i*offset_mean];
+
+		if(p/m>0)
+			div += (p - m) * __logf(p/m);
+	}
+
+	return div;
+}
+
+__device__  __forceinline__ float
+klEuclideanDivergence(float *feature_P, float *featur_Q, unsigned int feature_count, unsigned int bin_count_per_feature, unsigned int offset_P, unsigned int offset_Q)
+{
+	float div = 0.f;
+
+	for(int f=0;f<feature_count;f++)
+	{
+		float tmpDiv = 0.f;
+		for(int i=0;i<bin_count_per_feature;i++)
+		{
+			float a = feature_P[(f*bin_count_per_feature+i)*offset_P];
+			float b = featur_Q[(f*bin_count_per_feature+i)*offset_Q];
+
+			if(a/b>0)
+				tmpDiv += (a - b) * __logf(a/b);
+		}
+		div += (tmpDiv * tmpDiv);
+	}
+
+	return sqrtf(div);
+}
+
 
 class Div
 {

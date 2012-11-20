@@ -21,23 +21,11 @@ class DFPFHEstimator : public Feature {
 
 	enum Target
 	{
-		SDPFHistogram1,
-		SDPFHistogram2,
 
-		DFPFHistogram1,
-		DFPFHistogram2,
+		DFPFHistogram,
 
-		MeanHistogram1,
-		MeanHistogram2,
-
-		DivHistogram1,
-		DivHistogram2,
-
-		Sigma1,
-		Sigma2,
-
-		PDFPFHIndices,
-		PDFPFHInfoList,
+		PDFPFHIdxList,
+		PDFPFHIdxLength,
 	};
 
 	unsigned int n_view;
@@ -68,17 +56,17 @@ public:
 
 	DeviceDataInfoPtr getDFPFH()
 	{
-		return getTargetData(DFPFHistogram2);
+		return getTargetData(DFPFHistogram);
 	}
 
 	DeviceDataInfoPtr getPersistanceIndexList()
 	{
-		return getTargetData(PDFPFHIndices);
+		return getTargetData(PDFPFHIdxList);
 	}
 
 	DeviceDataInfoPtr getPersistenceInfoList()
 	{
-		return getTargetData(PDFPFHInfoList);
+		return getTargetData(PDFPFHIdxLength);
 	}
 
 };

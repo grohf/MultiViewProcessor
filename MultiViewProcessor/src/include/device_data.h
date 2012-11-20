@@ -21,6 +21,7 @@ enum DeviceDataType
 	Sigma		= 0x30,
 	ListItem	= 0x40,
 	Matrix = 0x50,
+	MetaData = 0x60,
 };
 
 enum ElementType
@@ -29,6 +30,8 @@ enum ElementType
 	UCHAR2 	= 0x02,
 	UCHAR3 	= 0x03,
 	UCHAR4 	= 0x04,
+
+	INT1 	= 0x11,
 
 	UINT1 	= 0x21,
 	UINT2 	= 0x22,

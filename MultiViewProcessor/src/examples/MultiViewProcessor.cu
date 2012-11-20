@@ -291,6 +291,15 @@ void TestSynthInput()
 
 	p.start();
 
+//	thrust::device_ptr<unsigned int> Infodptr = thrust::device_pointer_cast((unsigned int *)dfpfhEstimator->getPersistenceInfoList()->getDeviceDataPtr().get());
+//	thrust::device_vector<unsigned int> d_idxLength (Infodptr,Infodptr+2);
+//	thrust::host_vector<unsigned int> h_idxLength = d_idxLength;
+//
+//	for(int i=0;i<h_idxLength.size();i++)
+//	{
+//		printf("%d --> %d \n",i,h_idxLength.data()[i]);
+//	}
+
 //	thrust::device_ptr<float4> dptr = thrust::device_pointer_cast((float4 *)atrousfilter->getFilteredWorldCoordinates()->getDeviceDataPtr().get());
 //	thrust::device_vector<float4> d_points(dptr,dptr+2*640*480);
 //	thrust::host_vector<float4> h_points = d_points;

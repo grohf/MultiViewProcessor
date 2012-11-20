@@ -12,6 +12,24 @@
 #include <device_data.h>
 #include <vector>
 
+
+namespace device
+{
+	struct FeatureBaseKernel
+	{
+		enum
+		{
+			WARP_SIZE = 32,
+			features = 3,
+			bins_per_feature = 11,
+			bins = features * bins_per_feature,
+			bins_n_meta = bins + 1,
+		};
+
+	};
+}
+
+
 class Feature;
 typedef boost::shared_ptr<Feature> FeaturePtr;
 
