@@ -69,6 +69,8 @@ public:
 		return getTargetData(TransformationMetaDataList);
 	}
 
+	void TestRBTAFct();
+
 };
 
 #endif /* RIGIDBODYTRANSFORMATIONADVANCEDESTIMATIOR_H_ */

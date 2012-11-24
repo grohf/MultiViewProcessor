@@ -94,6 +94,35 @@ __device__ __forceinline__ float3 fetch(It &ptr)
     return *(float3*)&ptr;
 }
 
+__device__  __forceinline__ void compareAndSwap(float *a, float *b, unsigned int *ai, unsigned int *bi,unsigned int dir)
+{
+	if( (a[0] > b[0]) == dir )
+	{
+		float tmp = b[0];
+		b[0] = a[0];
+		a[0] = tmp;
+
+		unsigned int tmpIdx = bi[0];
+		bi[0] = ai[0];
+		ai[0] = tmpIdx;
+	}
+}
+
+__device__  __forceinline__ void compareAndSwap(float &a, float &b, unsigned int &ai, unsigned int &bi,unsigned int dir)
+{
+	if( (a > b) == dir )
+	{
+		float tmp = b;
+		b = a;
+		a = tmp;
+
+		unsigned int tmpIdx = bi;
+		bi = ai;
+		ai = tmpIdx;
+	}
+}
+
+
 
 __device__  __forceinline__ float
 klDivergence(float *feature, float *mean, unsigned int bins_count, unsigned int offset_feature, unsigned int offset_mean)
@@ -125,8 +154,64 @@ klEuclideanDivergence(float *feature_P, float *featur_Q, unsigned int feature_co
 			float a = feature_P[(f*bin_count_per_feature+i)*offset_P];
 			float b = featur_Q[(f*bin_count_per_feature+i)*offset_Q];
 
-			if(a/b>0)
-				tmpDiv += (a - b) * __logf(a/b);
+			if( !(a==0 && b==0) && a/b>0)
+			{
+//				tmpDiv += (a - b) * __logf(a/b);
+				tmpDiv += (a - b) * logf(a/b);
+			}
+		}
+		div += (tmpDiv * tmpDiv);
+	}
+
+	return sqrtf(div);
+}
+
+__device__  __forceinline__ float
+divergence(float *feature_P, float *featur_Q, unsigned int feature_count, unsigned int bin_count_per_feature, unsigned int offset_P, unsigned int offset_Q)
+{
+	float div = 0.f;
+
+
+	return div;
+}
+
+__device__  __forceinline__ float
+chiSquaredDivergence(float *feature_P, float *featur_Q, unsigned int feature_count, unsigned int bin_count_per_feature, unsigned int offset_P, unsigned int offset_Q)
+{
+	float div = 0.f;
+
+	for(int f=0;f<feature_count*bin_count_per_feature;f++)
+	{
+		float a = feature_P[f*offset_P];
+		float b = featur_Q[f*offset_Q];
+
+		if(a+b != 0)
+		{
+			div += ((a-b)*(a-b)) / (a+b) ;
+		}
+	}
+
+	return div;
+}
+
+__device__  __forceinline__ float
+chiSquaredEuclideanDivergence(float *feature_P, float *featur_Q, unsigned int feature_count, unsigned int bin_count_per_feature, unsigned int offset_P, unsigned int offset_Q)
+{
+	float div = 0.f;
+
+
+	for(int f=0;f<feature_count;f++)
+	{
+		float tmpDiv = 0.f;
+		for(int i=0;i<bin_count_per_feature;i++)
+		{
+			float a = feature_P[(f*bin_count_per_feature+i)*offset_P];
+			float b = featur_Q[(f*bin_count_per_feature+i)*offset_Q];
+
+			if(a+b != 0)
+			{
+				div += ((a-b)*(a-b)) / (a+b) ;
+			}
 		}
 		div += (tmpDiv * tmpDiv);
 	}
@@ -135,10 +220,18 @@ klEuclideanDivergence(float *feature_P, float *featur_Q, unsigned int feature_co
 }
 
 
+template <typename DivType>
 class Div
 {
+	enum Norm
+	{
+		ChiSquared,
+		KL,
+		L2,
+	};
+
 public:
-	__device__ __forceinline__ void operator() (float *a, float *b,unsigned int off)
+	__device__ __forceinline__ void operator() (float *feature_P, float *featur_Q, unsigned int feature_count, unsigned int bin_count_per_feature, unsigned int offset_P, unsigned int offset_Q)
 	{
 
 	}

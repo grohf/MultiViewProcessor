@@ -36,6 +36,7 @@
 #include "../feature/DFPFHEstimator.h"
 #include "../feature/SVDEstimatorCPU.h"
 #include "../feature/RigidBodyTransformationEstimator.h"
+#include "../feature/RigidBodyTransformationAdvancedEstimatior.h"
 #include "../feature/TranformationValidator.h"
 
 #include "../include/point_info.hpp"
@@ -154,8 +155,11 @@ void coorespTest()
 
 void TesterFct()
 {
-	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(1);
-	dfpfhEstimator->TestDFPFHE();
+//	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(1);
+//	dfpfhEstimator->TestDFPFHE();
+
+	RigidBodyTransformationAdvancedEstimatior *ebtae = new RigidBodyTransformationAdvancedEstimatior(2,32,32,32);
+	ebtae->TestRBTAFct();
 
 //	TranformationValidator *validator = new TranformationValidator(2,512);
 //	validator->TestMinimumPicker();
@@ -288,6 +292,14 @@ void TestSynthInput()
 	dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
 	p.addFeature(dfpfhEstimator);
+
+
+	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(2,32,32,32);
+	transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+	transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
+	transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
+	transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
+	p.addFeature(transform);
 
 	p.start();
 
