@@ -294,7 +294,7 @@ void TestSynthInput()
 	p.addFeature(dfpfhEstimator);
 
 
-	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(2,32,32,32);
+	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(2,128,1024,32);
 	transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
 	transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
