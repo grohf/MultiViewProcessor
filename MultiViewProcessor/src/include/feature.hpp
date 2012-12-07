@@ -15,11 +15,11 @@
 
 namespace device
 {
-	struct FeatureBaseKernel
+	struct FeatureBaseKernel : public BaseKernel
 	{
 		enum
 		{
-			WARP_SIZE = 32,
+			TMatrixDim = 12,
 			features = 3,
 			bins_per_feature = 11,
 			bins = features * bins_per_feature,

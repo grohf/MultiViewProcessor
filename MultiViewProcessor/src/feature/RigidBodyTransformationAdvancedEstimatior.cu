@@ -6,6 +6,7 @@
  */
 
 #include "RigidBodyTransformationAdvancedEstimatior.h"
+#include "../debug/EigenCheckClass.h"
 
 #include <curand.h>
 
@@ -30,6 +31,7 @@
 #include "../sink/pcd_io.h"
 #include "utils.hpp"
 #include "device_utils.hpp"
+
 
 
 namespace device
@@ -505,7 +507,7 @@ namespace device
 
 			combinationError_per_block = dx/n_corresp,
 
-			minLength = 5,
+			minLength = 20,
 		};
 
 
@@ -735,6 +737,8 @@ namespace device
 
 //			groups_per_warp = WARP_SIZE/n_corresp,
 //			group_length = WARP_SIZE/groups_per_warp,
+
+			VALUE_CTRL = 1000,
 		};
 
 		float4 			*input_pos;
@@ -765,7 +769,7 @@ namespace device
 		__device__ __forceinline__ void
 		operator () () const
 		{
-			__shared__ float points[dx*6];
+			__shared__ float points[dx*6*2];
 //			__shared__ float combLength[n_matrices*n_combinations];
 			__shared__ float buffer[dx];
 
@@ -826,21 +830,22 @@ namespace device
 //			if(blockIdx.x==0 && gtid==0 && gid < 10)
 //				printf("gid_ %d -> idx: %d  \n",gid,idx);
 
-			if(blockIdx.x==0 && gid + wid*groups_per_warp == 2)
-				printf("src: gtid %d -> pidx: %d  \n",gtid,pidx);
 
-			points[dx*0 + tid] = tmp.x;
-			points[dx*1 + tid] = tmp.y;
-			points[dx*2 + tid] = tmp.z;
+			points[dx*0 + tid] = tmp.x/VALUE_CTRL;
+			points[dx*1 + tid] = tmp.y/VALUE_CTRL;
+			points[dx*2 + tid] = tmp.z/VALUE_CTRL;
+
+//			if(blockIdx.x==0 && gid + wid*groups_per_warp == 0)
+//				printf("src: gtid %d -> pidx: %d => (%f/%f/%f) \n",gtid,pidx,tmp.x,tmp.y,tmp.z);
 
 			pidx = input_correspIdx[combinationListOffset+blockIdx.z*errorList_length*n_corresp+idx*n_corresp+gtid];
 			tmp = input_pos[view_target*640*480+pidx];
-			points[dx*3 + tid] = tmp.x;
-			points[dx*4 + tid] = tmp.y;
-			points[dx*5 + tid] = tmp.z;
+			points[dx*3 + tid] = tmp.x/VALUE_CTRL;
+			points[dx*4 + tid] = tmp.y/VALUE_CTRL;
+			points[dx*5 + tid] = tmp.z/VALUE_CTRL;
 
-			if(blockIdx.x==0 && gid + wid*groups_per_warp == 2)
-				printf("target: gtid %d -> pidx: %d  \n",gtid,pidx);
+//			if(blockIdx.x==0 && gid + wid*groups_per_warp == 0)
+//				printf("target: gtid %d -> pidx: %d => (%f/%f/%f) \n",gtid,pidx,tmp.x,tmp.y,tmp.z);
 
 
 
@@ -851,6 +856,16 @@ namespace device
 
 
 			__syncthreads();
+
+//			if(blockIdx.x==0 && tid==0)
+//			{
+//				for(int i=0;i<14*n_corresp;i++)
+//				{
+//					printf("points: %d -> (%f/%f/%f) | (%f/%f/%f) \n",i,
+//							points[0*dx+i],points[1*dx+i],points[2*dx+i],
+//							points[3*dx+i],points[4*dx+i],points[5*dx+i]);
+//				}
+//			}
 
 			for(int d=0;d<6;d++)
 			{
@@ -868,13 +883,23 @@ namespace device
 					if(groups_per_warp<=8) 	warpLine[posb + gtid] += warpLine[posb + gtid + 2];
 					if(groups_per_warp<=16) warpLine[posb + gtid] += warpLine[posb + gtid + 1];
 
-					if(gtid<groups_per_warp)
+					if(wtid<groups_per_warp)
 					{
-						centroids[d*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*n_corresp]/n_corresp;
+						centroids[d*n_matrices+wid*groups_per_warp+wtid] = warpLine[wtid*n_corresp]/n_corresp;
 					}
 				}
 			}
 			__syncthreads();
+
+//			if(blockIdx.x==0 && tid==0)
+//			{
+//				for(int i=0;i<14;i++)
+//				{
+//					printf("cent: %d -> (%f/%f/%f) | (%f/%f/%f) \n",i,
+//							centroids[0*n_matrices+i],centroids[1*n_matrices+i],centroids[2*n_matrices+i],
+//							centroids[3*n_matrices+i],centroids[4*n_matrices+i],centroids[5*n_matrices+i]);
+//				}
+//			}
 
 			points[dx*0 + threadIdx.x] -= centroids[0*n_matrices+wid*groups_per_warp+gid];
 			points[dx*1 + threadIdx.x] -= centroids[1*n_matrices+wid*groups_per_warp+gid];
@@ -904,9 +929,9 @@ namespace device
 						if(groups_per_warp<=16) warpLine[posb + gtid] += warpLine[posb + gtid + 1];
 
 
-						if(gtid<groups_per_warp)
+						if(wtid<groups_per_warp)
 						{
-							matricesH[(sd*3+td)*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*n_corresp];
+							matricesH[(sd*3+td)*n_matrices+wid*groups_per_warp+wtid] = warpLine[wtid*n_corresp];
 //							output_correlationMatrixes[ (sd*3+td)*n_rsac+blockIdx.x*n_matrices+wid*groups_per_warp+gtid] = warpLine[gtid*group_length];
 
 						}
@@ -932,19 +957,33 @@ namespace device
 
 				cov[5] = matricesH[6*n_matrices + threadIdx.x]*matricesH[6*n_matrices + threadIdx.x] + matricesH[7*n_matrices + threadIdx.x]*matricesH[7*n_matrices + threadIdx.x] + matricesH[8*n_matrices + threadIdx.x]*matricesH[8*n_matrices + threadIdx.x];
 
-//				if()
-
                 typedef Eigen33::Mat33 Mat33;
                 Eigen33 eigen33(cov);
+
+
+//				if(blockIdx.x==0 && tid==0)
+//					printf("Mat33: %d \n",sizeof(Mat33));
+
+//                Mat33& tmp 		= (Mat33&)points[n_matrices*6+threadIdx.x*9];
+//                Mat33& vec_tmp 	= (Mat33&)points[n_matrices*(6+9)+threadIdx.x*9];
+//                Mat33& evecs 	= (Mat33&)points[n_matrices*(6+18)+threadIdx.x*9];
 
                 Mat33& tmp 		= (Mat33&)points[n_matrices*6+threadIdx.x*9];
                 Mat33& vec_tmp 	= (Mat33&)points[n_matrices*(6+9)+threadIdx.x*9];
                 Mat33& evecs 	= (Mat33&)points[n_matrices*(6+18)+threadIdx.x*9];
+
                 float3 evals;
 
                 eigen33.compute(tmp, vec_tmp, evecs, evals);
 
-    			if(evals.x==0 || evals.y == 0 || evals.z == 0)
+//                if(blockIdx.x ==0 && tid<10)
+//                	printf("evals: %d : %f %f %f -> %f %f %f \n",tid,evals.x,evals.y,evals.z,
+//                			1.f/sqrt(evals.x),1.f/sqrt(evals.y),1.f/sqrt(evals.z));
+
+//                if(evals.x==0.f)
+//                	evals.x = 1.f;
+
+    			if(evals.x==0.f || evals.y == 0.f || evals.z == 0.f)
     			{
 //    				printf("out: %d \n",threadIdx.x);
 
@@ -1041,8 +1080,8 @@ namespace device
 				det -= vec_tmp[0].y * vec_tmp[1].x * vec_tmp[2].z;
 				det -= vec_tmp[0].x * vec_tmp[1].z * vec_tmp[2].y;
 
-				if(tid<5)
-					printf("%d -> %f \n",tid,det);
+//				if(tid<13)
+//					printf("det: %d -> %f \n",tid,det);
 
 				int ret = (det < 0.9f || det > 1.1f)?(int)-1:(int)(blockIdx.x*n_matrices+threadIdx.x);
 
@@ -1079,20 +1118,72 @@ namespace device
 				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 8*gridDim.x*n_matrices + blockIdx.x*n_matrices +threadIdx.x] = vec_tmp[2].z;
 
 
-				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 9*gridDim.x*n_matrices 	+ blockIdx.x*n_matrices +threadIdx.x]  	= centroids[3*n_matrices+threadIdx.x] - (vec_tmp[0].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[0].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[0].z*centroids[2*n_matrices+threadIdx.x]);
-				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 10*gridDim.x*n_matrices + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[4*n_matrices+threadIdx.x] - (vec_tmp[1].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[1].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[1].z*centroids[2*n_matrices+threadIdx.x]);
-				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 11*gridDim.x*n_matrices + blockIdx.x*n_matrices +threadIdx.x]  	= centroids[5*n_matrices+threadIdx.x] - (vec_tmp[2].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[2].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[2].z*centroids[2*n_matrices+threadIdx.x]);
+				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 9*gridDim.x*n_matrices 	+ blockIdx.x*n_matrices +threadIdx.x]  	= (centroids[3*n_matrices+threadIdx.x] - (vec_tmp[0].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[0].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[0].z*centroids[2*n_matrices+threadIdx.x]))*VALUE_CTRL;
+				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 10*gridDim.x*n_matrices + blockIdx.x*n_matrices +threadIdx.x]  	= (centroids[4*n_matrices+threadIdx.x] - (vec_tmp[1].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[1].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[1].z*centroids[2*n_matrices+threadIdx.x]))*VALUE_CTRL;
+				output_transformationMatrices[blockIdx.z*gridDim.x*n_matrices*12 + 11*gridDim.x*n_matrices + blockIdx.x*n_matrices +threadIdx.x]  	= (centroids[5*n_matrices+threadIdx.x] - (vec_tmp[2].x*centroids[0*n_matrices+threadIdx.x] + vec_tmp[2].y*centroids[1*n_matrices+threadIdx.x] + vec_tmp[2].z*centroids[2*n_matrices+threadIdx.x]))*VALUE_CTRL;
 			}
 		}
 
 	};
 	__global__ void estimateTransformations(const TransformationMatrixEstimator tfe){ tfe(); }
+
+	struct TransformationMatrixFinalCopyKernel : public TransformationBaseKernel
+	{
+		enum
+		{
+			threads = 1024,
+			TMatrixDim = 12,
+		};
+
+		float *input_transformations;
+		float *output_transformations;
+
+		unsigned int rn;
+		unsigned int errorListLength;
+
+		__device__ __forceinline__ void
+		operator () () const
+		{
+
+			unsigned int gid = blockIdx.x*blockDim.x + threadIdx.x;
+			unsigned int y = gid/rn;
+			unsigned int x = gid - y*rn;
+
+//			if(blockIdx.x==1 && threadIdx.x==1023)
+//				printf("gid: %d | (%d/%d) ",gid,x,y);
+
+			if(x<rn && y<TMatrixDim)
+			{
+				output_transformations[blockIdx.z*rn*TMatrixDim+y*rn+x] = input_transformations[blockIdx.z*errorListLength*TMatrixDim+y*errorListLength+x];
+			}
+
+		}
+	};
+	__global__ void copyFinalTransformations(const TransformationMatrixFinalCopyKernel tc){ tc(); }
+
 }
 
 
 device::CorrespondenceListEstimator correspondanceList;
 device::CombinationErrorListEstimator combiErrorList;
 device::TransformationMatrixEstimator transformEstimator;
+device::TransformationMatrixFinalCopyKernel transformCopryKernel;
+
+template <typename T>
+struct is_not_valid_transform
+{
+    template <typename Tuple>  __device__
+    bool operator()(const Tuple& tuple) const
+    {
+        // unpack the tuple into x and y coordinates
+        const T x = thrust::get<0>(tuple);
+
+        if (x == -1)
+            return true;
+        else
+            return false;
+    }
+};
 
 void
 RigidBodyTransformationAdvancedEstimatior::init()
@@ -1104,6 +1195,8 @@ RigidBodyTransformationAdvancedEstimatior::init()
 
 	combiErrorList.input_pos = (float4 *)getInputDataPointer(Coordiantes);
 	transformEstimator.input_pos = (float4 *)getInputDataPointer(Coordiantes);
+
+	transformCopryKernel.output_transformations = (float *)getTargetDataPointer(TransformationMatrices);
 }
 
 void
@@ -1111,7 +1204,7 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 {
 
 	unsigned int view_combinations = ((n_view-1)*n_view)/2;
-	unsigned int errorListLength = 256*10;
+	unsigned int errorListLength = s*20;
 
 	printf("s: %d | errorList: %d | combinations: %d \n",s,errorListLength,view_combinations);
 
@@ -1235,24 +1328,32 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	thrust::device_vector<float4> h_pos = d_pos;
 	thrust::host_vector<unsigned int> h_combiError_correspListIdx = d_combiError_correspListIdx;
 
-	char path[50];
+	unsigned int n_out = 14;
+	EigenCheckClass::checkCorrespondancesSetQualityGT(h_pos,h_combiErrorIdx,h_combiError_correspListIdx,n_out,combiErrorList.n_corresp,view_combinations*errorListLength*combiErrorList.n_corresp,2);
+
+
+//	thrust::host_vector<float> tm(12);
+//	EigenCheckClass::setGroundTruthTransformation(tm);
+
+	char path[100];
 
 	uchar4 *img = (uchar4 *)malloc(640*480*2*sizeof(uchar4));
-	for(int i=0;i<2;i++)
+	bool output = false;
+	for(int i=0;i<5;i++)
 	{
-//		for(int p=0;p<640*480;p++)
-//		{
-//			float4 tmpf4 = h_pos[p];
-//			unsigned char g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
-//			img[p] = make_uchar4(g,g,g,128);
-//
-//			tmpf4 = h_pos[640*480+p];
-//			g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
-//			img[640*480+p] = make_uchar4(g,g,g,128);
-//		}
+		for(int p=0;p<640*480 && output;p++)
+		{
+			float4 tmpf4 = h_pos[p];
+			unsigned char g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
+			img[p] = make_uchar4(g,g,g,128);
+
+			tmpf4 = h_pos[640*480+p];
+			g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
+			img[640*480+p] = make_uchar4(g,g,g,128);
+		}
 
 		unsigned int idx_corresp = h_combiErrorIdx.data()[i];
-		printf("%d: \n",idx_corresp);
+//		printf("%d: \n",idx_corresp);
 		idx_corresp *= combiErrorList.n_corresp;
 		for(int c=0;c<combiErrorList.n_corresp;c++)
 		{
@@ -1260,13 +1361,22 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 			float4 tmpf4 = h_pos.data()[pos_idx];
 			printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
 
-//			uchar4 tuc4;
-//			if(c==0) tuc4 = make_uchar4(255,0,0,128);
-//			if(c==1) tuc4 = make_uchar4(0,255,0,128);
-//			if(c==2) tuc4 = make_uchar4(0,0,255,128);
-//			if(c==3) tuc4 = make_uchar4(255,255,0,128);
-//
-//			img[pos_idx] = tuc4;
+			if(output)
+			{
+				uchar4 tuc4;
+				int cg = 255.f;///(c/7+1);
+				int cm = c%7;
+				if(cm==0) tuc4 = make_uchar4(cg,0,0,128);
+				if(cm==1) tuc4 = make_uchar4(0,cg,0,128);
+				if(cm==2) tuc4 = make_uchar4(0,0,cg,128);
+				if(cm==3) tuc4 = make_uchar4(cg,cg,0,128);
+				if(cm==4) tuc4 = make_uchar4(cg,0,cg,128);
+				if(cm==5) tuc4 = make_uchar4(0,cg,cg,128);
+				if(cm==6) tuc4 = make_uchar4(cg,cg,cg,128);
+
+
+				img[pos_idx] = tuc4;
+			}
 		}
 		printf("\n");
 
@@ -1276,26 +1386,37 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 			float4 tmpf4 = h_pos.data()[640*480+pos_idx];
 			printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
 
-//			uchar4 tuc4;
-//			if(c==0) tuc4 = make_uchar4(255,0,0,128);
-//			if(c==1) tuc4 = make_uchar4(0,255,0,128);
-//			if(c==2) tuc4 = make_uchar4(0,0,255,128);
-//			if(c==3) tuc4 = make_uchar4(255,255,0,128);
-//
-//			img[640*480+pos_idx] = tuc4;
+			if(output)
+			{
+				uchar4 tuc4;
+				int cg = 255.f;///(c/7+1);
+				int cm = c%7;
+				if(cm==0) tuc4 = make_uchar4(cg,0,0,128);
+				if(cm==1) tuc4 = make_uchar4(0,cg,0,128);
+				if(cm==2) tuc4 = make_uchar4(0,0,cg,128);
+				if(cm==3) tuc4 = make_uchar4(cg,cg,0,128);
+				if(cm==4) tuc4 = make_uchar4(cg,0,cg,128);
+				if(cm==5) tuc4 = make_uchar4(0,cg,cg,128);
+				if(cm==6) tuc4 = make_uchar4(cg,cg,cg,128);
+
+
+				img[640*480+pos_idx] = tuc4;
+			}
 
 		}
 		printf("\n ----------------------------------\n");
 
 
-
-//		sprintf(path,"/home/avo/pcds/corresp/correspImg_%d_%f.ppm",i,h_combiError.data()[i]);
-//		sdkSavePPM4ub(path,(unsigned char*)img,640,480*2);
+		if(output)
+		{
+			sprintf(path,"/home/avo/pcds/corresp/correspImg_%d_%f.ppm",i,h_combiError.data()[i]);
+			sdkSavePPM4ub(path,(unsigned char*)img,640,480*2);
+		}
 	}
 
 
-	thrust::device_vector<int> d_validTransforms(rn*view_combinations);
-	thrust::device_vector<float> d_transformMatrices(rn*view_combinations*12);
+	thrust::device_vector<int> d_validTransforms(errorListLength*view_combinations);
+	thrust::device_vector<float> d_transformMatrices(errorListLength*view_combinations*12);
 
 	transformEstimator.input_combinationErrorIdx = combiErrorList.output_combinationIdx;
 	transformEstimator.input_correspIdx = combiErrorList.output_combinationCoresspIdx;
@@ -1308,7 +1429,7 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	transformEstimator.output_transformationMatrices = thrust::raw_pointer_cast(d_transformMatrices.data());
 
 	dim3 transformBlock(transformEstimator.dx);
-	dim3 transformGrid(rn/transformEstimator.n_matrices,1,view_combinations);
+	dim3 transformGrid(errorListLength/transformEstimator.n_matrices,1,view_combinations);
 
 	printf("transformGrid: %d %d %d \n",transformGrid.x,transformGrid.y,transformGrid.z);
 	device::estimateTransformations<<<transformGrid,transformEstimator.dx>>>(transformEstimator);
@@ -1317,28 +1438,137 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 
 	thrust::host_vector<int> h_validTransforms = d_validTransforms;
 	thrust::host_vector<float> h_transformMatrices = d_transformMatrices;
-	for(int i=0;i<5;i++)
+	for(int i=0;i<n_out;i++)
 	{
 //		if(h_validTransforms[i]>=0)
 		{
 			printf("%d ",i);
 			for(int m=0;m<12;m++)
 			{
-				printf("%f | ",h_transformMatrices[m*rn+i]);
+				printf("%f | ",h_transformMatrices[m*errorListLength+i]);
 			}
 			printf("\n");
 		}
 	}
 
+	thrust::device_vector<int> d_validTransformationRota = d_validTransforms;
+	thrust::device_vector<int> d_validTransformationTrans = d_validTransforms;
+
+	size_t size1 = 0;
+	size_t size2 = 0;
+	for(int v=0;v<view_combinations;v++)
+	{
+
+		size1 += thrust::remove_if(
+		thrust::make_zip_iterator(
+		thrust::make_tuple(
+				d_validTransformationRota.data()+v*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+0*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength)),
+
+		thrust::make_zip_iterator(
+		thrust::make_tuple(
+				d_validTransformationRota.data()+(v+1)*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+9*errorListLength)),
+
+				is_not_valid_transform<float>()) -
+
+		thrust::make_zip_iterator(
+		thrust::make_tuple(
+				d_validTransformationRota.data()+v*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+0*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
+				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength));
+
+		size2 += thrust::remove_if(
+			thrust::make_zip_iterator(
+			thrust::make_tuple(
+					d_validTransformationTrans.data()+v*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+9*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength)),
+
+			thrust::make_zip_iterator(
+			thrust::make_tuple(
+					d_validTransformationTrans.data()+(v+1)*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+12*errorListLength)),
+
+					is_not_valid_transform<float>()) -
+
+			thrust::make_zip_iterator(
+			thrust::make_tuple(
+					d_validTransformationTrans.data()+v*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+9*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
+					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength));
+	}
+
+	thrust::host_vector<int> h_validTransformation_out = d_validTransformationRota;
+	thrust::host_vector<int> h_validTransformationTransform_out = d_validTransformationTrans;
+	thrust::host_vector<float> h_transformMatrices_out = d_transformMatrices;
+
+	printf("size: %d \n",size1);
+	for(int i=0;i<10;i++)
+	{
+		printf(" %d -> %d --> ",i,h_validTransformation_out[i]);
+		for(int m=0;m<12;m++)
+		{
+			printf("%f | ",h_transformMatrices_out[m*errorListLength+i]);
+		}
+		printf("\n");
+	}
 
 
+	transformCopryKernel.input_transformations = thrust::raw_pointer_cast(d_transformMatrices.data());
+	transformCopryKernel.rn = rn;
+	transformCopryKernel.errorListLength = errorListLength;
 
-//	thrust::host_vector<float> h_rndSList = d_rndSList;
-//
-//	for(int i=0;i<s*view_combinations;i+=8)
-//	{
-//		printf("%d -> %f \n",i,h_rndSList.data()[i]);
-//	}
+
+	dim3 copyGrid( (rn*transformCopryKernel.TMatrixDim - 1 )/transformCopryKernel.threads + 1,1,view_combinations);
+
+	printf("rn: %d | copyGrid: %d %d %d \n",rn,copyGrid.x,copyGrid.y,copyGrid.z);
+	device::copyFinalTransformations<<<copyGrid,transformCopryKernel.threads>>>(transformCopryKernel);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+
+	thrust::device_ptr<float> dptr_transformMatrices = thrust::device_pointer_cast(transformCopryKernel.output_transformations);
+
+	thrust::device_vector<float> d_transEnd(dptr_transformMatrices,dptr_transformMatrices+rn*view_combinations*12);
+	thrust::host_vector<float> h_transEnd = d_transEnd;
+
+	for(int i=0;i<10;i++)
+	{
+		printf("End: %d -> ",i);
+		for(int m=0;m<12;m++)
+		{
+			printf("%f | ",h_transEnd[m*rn+i]);
+		}
+		printf("\n");
+	}
 
 }
 
@@ -1353,12 +1583,12 @@ RigidBodyTransformationAdvancedEstimatior::RigidBodyTransformationAdvancedEstima
 	transformationmatrixesParams.dataType = Matrix;
 	addTargetData(addDeviceDataRequest(transformationmatrixesParams),TransformationMatrices);
 
-	DeviceDataParams transformationMetaDataList;
-	transformationMetaDataList.elements = ((n_view-1)*n_view)/2;
-	transformationMetaDataList.element_size = sizeof(int);
-	transformationMetaDataList.elementType = TransformationInfoListItem;
-	transformationMetaDataList.dataType = Indice;
-	addTargetData(addDeviceDataRequest(transformationMetaDataList),TransformationMetaDataList);
+//	DeviceDataParams transformationMetaDataList;
+//	transformationMetaDataList.elements = ((n_view-1)*n_view)/2;
+//	transformationMetaDataList.element_size = sizeof(int);
+//	transformationMetaDataList.elementType = TransformationInfoListItem;
+//	transformationMetaDataList.dataType = Indice;
+//	addTargetData(addDeviceDataRequest(transformationMetaDataList),TransformationMetaDataList);
 }
 
 void RigidBodyTransformationAdvancedEstimatior::TestRBTAFct()
@@ -1401,8 +1631,6 @@ void RigidBodyTransformationAdvancedEstimatior::TestRBTAFct()
 	device::estimateBestCorrespondences<<<TestGrid,TestBlock>>>(correspondanceList);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
-
-
 
 }
 

@@ -13,11 +13,12 @@
 class EigenCheckClass {
 
 public:
-	thrust::host_vector<float4> pos_m;
-	thrust::host_vector<float4> pos_d;
-
-	thrust::host_vector<float> H;
-	thrust::host_vector<float> T;
+//	thrust::host_vector<float4> pos_m;
+//	thrust::host_vector<float4> pos_d;
+//
+//	thrust::host_vector<float> H;
+//	thrust::host_vector<float> T;
+	static thrust::host_vector<float> GT_transformation;
 
 public:
 	EigenCheckClass();
@@ -33,6 +34,13 @@ public:
 	static void getTransformationFromQuaternion(unsigned int n_view,thrust::host_vector<float>& in_qaternions,thrust::host_vector<float>& tranformmatrices,bool anchorFist=true);
 
 	static void checkCorrelationQuality(thrust::host_vector<float4> points_view1,thrust::host_vector<float4> points_view2,thrust::host_vector<float> transforamtion,float threshhold);
+
+	static void checkCorrespondancesSetQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> csetIdx, thrust::host_vector<unsigned int> cset, unsigned int sets , unsigned int setLength, unsigned int offset, unsigned int modus=0);
+	static void checkCorrespondancesSetCombinationQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> csetIdx, thrust::host_vector<unsigned int> cset, unsigned int sets, unsigned int n_set_combi , unsigned int setLength, unsigned int offset, unsigned int modus=0);
+
+	static void checkGlobalFineRegistration(unsigned int n_view,thrust::host_vector<float4> pos);
+
+	static void setGroundTruthTransformation(thrust::host_vector<float> tm);
 };
 
 #endif /* EIGENCHECKCLASS_H_ */

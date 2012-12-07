@@ -25,10 +25,12 @@ public:
 		fptr.reset(this);
 	}
 
-//	FilterPtr operator=(Filter const *f)
-//	{
-//		return ptr;
-//	}
+	FilterPtr getFilterPtr()
+	{
+		return fptr;
+	}
+
+
 
 	virtual void init() = 0;
 	virtual void execute() = 0;

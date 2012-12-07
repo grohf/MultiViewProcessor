@@ -69,6 +69,12 @@ public:
 		addFeature(feature->getFeaturePtr());
 	}
 
+	void addFilter(Filter *filter)
+	{
+		addFilter(filter->getFilterPtr());
+	}
+
+
 private:
 
 	void addRequestedDeviceData(std::vector<DeviceDataInfoPtr> list)

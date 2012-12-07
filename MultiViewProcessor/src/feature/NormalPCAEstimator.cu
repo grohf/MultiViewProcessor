@@ -318,28 +318,28 @@ NormalPCAEstimator::execute()
 		sprintf(path,"/home/avo/pcds/normals_pca_%d.ppm",v);
 		sdkSavePPM4ub(path,(unsigned char *)h_uc4,640,480);
 
-//		uchar4 *h_curv = (uchar4 *)malloc(640*480*sizeof(uchar4));
-//		for(int i=0;i<640*480;i++)
-//		{
-//			if(h_f4_normals[i].w >= 0.0f && h_f4_normals[i].w < 0.03f)
-//			{
-//				h_curv[i].x = 255;
-//				h_curv[i].y = 0;
-//				h_curv[i].z = 0;
-//				h_curv[i].w = 127.f;
-//			}
-//			else
-//			{
-//					h_curv[i].x = 0;
-//					h_curv[i].y = 0;
-//					h_curv[i].z = 0;
-//					h_curv[i].w = 127.f;
-//			}
-//
-//		}
-//
-//		sprintf(path,"/home/avo/pcds/curv_pca_%d.ppm",v);
-//		sdkSavePPM4ub(path,(unsigned char *)h_curv,640,480);
+		uchar4 *h_curv = (uchar4 *)malloc(640*480*sizeof(uchar4));
+		for(int i=0;i<640*480;i++)
+		{
+			if(h_f4_normals[i].w >= 0.0f && h_f4_normals[i].w < 0.03f)
+			{
+				h_curv[i].x = 255;
+				h_curv[i].y = 0;
+				h_curv[i].z = 0;
+				h_curv[i].w = 127.f;
+			}
+			else
+			{
+					h_curv[i].x = 0;
+					h_curv[i].y = 0;
+					h_curv[i].z = 0;
+					h_curv[i].w = 127.f;
+			}
+
+		}
+
+		sprintf(path,"/home/avo/pcds/curv_pca_%d.ppm",v);
+		sdkSavePPM4ub(path,(unsigned char *)h_curv,640,480);
 	}
 
 //	char path[50];

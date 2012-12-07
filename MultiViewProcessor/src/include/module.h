@@ -16,6 +16,17 @@
 #include <vector>
 #include <map>
 
+namespace device
+{
+	struct BaseKernel
+	{
+		enum
+		{
+			WARP_SIZE = 32,
+		};
+	};
+}
+
 class Module {
 public:
 

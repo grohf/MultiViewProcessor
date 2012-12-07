@@ -31,6 +31,7 @@
 #include "../filter/TestFilter2.h"
 #include "../filter/ATrousFilter.h"
 #include "../filter/TruncateThresholdFilter.h"
+#include "../filter/HistogramThresholdSegmentation.h"
 #include "../feature/NormalPCAEstimator.h"
 #include "../feature/FPFH.h"
 #include "../feature/DFPFHEstimator.h"
@@ -38,6 +39,7 @@
 #include "../feature/RigidBodyTransformationEstimator.h"
 #include "../feature/RigidBodyTransformationAdvancedEstimatior.h"
 #include "../feature/TranformationValidator.h"
+#include "../feature/SimpleNormalEstimator.h"
 
 #include "../include/point_info.hpp"
 
@@ -158,8 +160,8 @@ void TesterFct()
 //	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(1);
 //	dfpfhEstimator->TestDFPFHE();
 
-	RigidBodyTransformationAdvancedEstimatior *ebtae = new RigidBodyTransformationAdvancedEstimatior(2,32,32,32);
-	ebtae->TestRBTAFct();
+//	RigidBodyTransformationAdvancedEstimatior *ebtae = new RigidBodyTransformationAdvancedEstimatior(2,32,32,32);
+//	ebtae->TestRBTAFct();
 
 //	TranformationValidator *validator = new TranformationValidator(2,512);
 //	validator->TestMinimumPicker();
@@ -168,6 +170,10 @@ void TesterFct()
 
 //	EigenCheckClass *cpuCheck = new EigenCheckClass();
 //	cpuCheck->createTestOMRotation();
+//	cpuCheck->testSVD();
+
+	thrust::host_vector<float4> pos(2*640*480);
+	EigenCheckClass::checkGlobalFineRegistration(2,pos);
 //
 //	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,256,64,32);
 //	rbEstimator->TestCorrelationMatrix(cpuCheck->pos_m,cpuCheck->pos_d,cpuCheck->H);
@@ -259,33 +265,39 @@ void TestSynthInput()
 	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false);
 	p.setSource(SourcePtr(src));
 
-	ATrousFilter *atrousfilter = new ATrousFilter(2,2,15,3,2);
+//	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(2);
+//	seg->setPointCoordinates(src->getWorldCoordinates());
+//	p.addFilter(seg);
+
+
+
+	ATrousFilter *atrousfilter = new ATrousFilter(2,3,30,0,2);
 	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 	atrousfilter->setPointIntensity(src->getIntensity());
-	p.addFilter(FilterPtr(atrousfilter));
+	p.addFilter(atrousfilter);
+
+	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(2);
+	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFilter(seg);
+
+	SimpleNormalEstimator *sne = new SimpleNormalEstimator(2);
+	sne->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(sne);
+
+
+
+/*
 
 	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2,50);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
-	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,400.f,2000.f);
-	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
-	p.addFilter(FilterPtr(truncateThresholdFilter));
 
-//	FPFH *fpfhEstimator = new FPFH(2);
-//	fpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
-//	fpfhEstimator->setNormals(nPCAestimator->getNormals());
-//	p.addFeature(fpfhEstimator);
-//
-//	unsigned int r_ransac = 1024;
-//
-//	RigidBodyTransformationEstimator *rbEstimator = new RigidBodyTransformationEstimator(2,r_ransac,512,32);
-//	rbEstimator->setPersistanceHistogramMap(fpfhEstimator->getFPFH());
-//	rbEstimator->setPersistanceIndexList(fpfhEstimator->getPersistanceIndexList());
-//	rbEstimator->setPersistenceInfoList(fpfhEstimator->getPersistenceInfoList());
-//	rbEstimator->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
-//	p.addFeature(rbEstimator);
+//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,400.f,1540.07f);
+//	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+//	p.addFilter(truncateThresholdFilter);
+
 
 
 	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(2);
@@ -293,15 +305,26 @@ void TestSynthInput()
 	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
 	p.addFeature(dfpfhEstimator);
 
-
-	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(2,128,1024,32);
+	unsigned n_ransac = 128;
+	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(2,n_ransac,2048,32);
 	transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
 	transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
 	transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
 	p.addFeature(transform);
 
+	TranformationValidator *validator = new TranformationValidator(2,n_ransac);
+	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+	validator->setNormals(nPCAestimator->getNormals());
+	validator->setSensorInfoList(src->getSensorV2InfoList());
+	validator->setTransformationmatrices(transform->getTransformationMatrices());
+
+	p.addFeature(validator);
+*/
+
 	p.start();
+
+
 
 //	thrust::device_ptr<unsigned int> Infodptr = thrust::device_pointer_cast((unsigned int *)dfpfhEstimator->getPersistenceInfoList()->getDeviceDataPtr().get());
 //	thrust::device_vector<unsigned int> d_idxLength (Infodptr,Infodptr+2);

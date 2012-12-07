@@ -18,7 +18,8 @@ class TranformationValidator : public Feature {
 	{
 		WorldCoords,
 		Normals,
-		SensorInfoList,
+//		SensorInfoList,
+		SensorInfoListV2,
 		TransforamtionMatrices,
 		TransformationInfoList,
 	};
@@ -76,7 +77,7 @@ public:
 
 	void setSensorInfoList(DeviceDataInfoPtr ddi)
 	{
-		addInputData(ddi,SensorInfoList);
+		addInputData(ddi,SensorInfoListV2);
 	}
 
 	void setTransformationmatrices(DeviceDataInfoPtr ddi)

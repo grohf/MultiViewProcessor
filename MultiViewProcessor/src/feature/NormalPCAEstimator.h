@@ -41,7 +41,8 @@ public:
 	{
 		return getTargetData(Normals);
 	}
-	void setWorldCoordinates(DeviceDataInfoPtr ddip){
+	void setWorldCoordinates(DeviceDataInfoPtr ddip)
+	{
 		addInputData(ddip,WorldCoordinates);
 	}
 

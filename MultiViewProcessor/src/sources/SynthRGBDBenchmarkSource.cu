@@ -67,9 +67,9 @@ namespace device
 //			wy -= transformationmatrices[view*12+10];
 //			wz -= transformationmatrices[view*12+11];
 
-			tx = transformationmatrices[view*12+0] * wx + transformationmatrices[view*12+1] * wy + transformationmatrices[view*12+2] * wz + transformationmatrices[view*12+9]*1000.f;
-			ty = transformationmatrices[view*12+3] * wx + transformationmatrices[view*12+4] * wy + transformationmatrices[view*12+5] * wz + transformationmatrices[view*12+10]*1000.f;
-			tz = transformationmatrices[view*12+6] * wx + transformationmatrices[view*12+7] * wy + transformationmatrices[view*12+8] * wz + transformationmatrices[view*12+11]*1000.f;
+			tx = transformationmatrices[view*12+0] * wx + transformationmatrices[view*12+1] * wy + transformationmatrices[view*12+2] * wz + transformationmatrices[view*12+9];
+			ty = transformationmatrices[view*12+3] * wx + transformationmatrices[view*12+4] * wy + transformationmatrices[view*12+5] * wz + transformationmatrices[view*12+10];
+			tz = transformationmatrices[view*12+6] * wx + transformationmatrices[view*12+7] * wy + transformationmatrices[view*12+8] * wz + transformationmatrices[view*12+11];
 		}
 
 		__device__ __forceinline__ void
@@ -527,7 +527,18 @@ void SynthRGBDBenchmarkSource::loadFrame()
 			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
 			checkCudaErrors(cudaMemcpy(h_f4_depth,synthRGBDLoader.xyzi+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-			sprintf(path,"/home/avo/pcds/synth_wc_points_%d.pcd",i);
+//			for(int p=0;p<640*480;p++)
+//			{
+//				float4 t = h_f4_depth[p];
+//				h_f4_depth[p].x = h_transformationMatrices[i*12+0]*t.x + h_transformationMatrices[i*12+1]*t.y + h_transformationMatrices[i*12+2]*t.z + h_transformationMatrices[i*12+9];
+//				h_f4_depth[p].y = h_transformationMatrices[i*12+3]*t.x + h_transformationMatrices[i*12+4]*t.y + h_transformationMatrices[i*12+5]*t.z + h_transformationMatrices[i*12+10];
+//				h_f4_depth[p].z = h_transformationMatrices[i*12+6]*t.x + h_transformationMatrices[i*12+7]*t.y + h_transformationMatrices[i*12+8]*t.z + h_transformationMatrices[i*12+11];
+//			}
+
+			if(transform)
+				sprintf(path,"/home/avo/pcds/synth_wc_points_transformed_%d.pcd",i);
+			else
+				sprintf(path,"/home/avo/pcds/synth_wc_points_%d.pcd",i);
 			host::io::PCDIOController pcdIOCtrl;
 			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
 		}

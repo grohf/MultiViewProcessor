@@ -28,33 +28,49 @@
 
 namespace device
 {
-	namespace constant
+//	namespace constant
+//	{
+//		__constant__ unsigned int idx2d[(MAXVIEWS*MAXVIEWS-1)/2];
+//		__constant__ unsigned int idx2m[(MAXVIEWS*MAXVIEWS-1)/2];
+//	}
+
+	struct TransformationBaseKernel : public FeatureBaseKernel
 	{
-		__constant__ unsigned int idx2d[(MAXVIEWS*MAXVIEWS-1)/2];
-		__constant__ unsigned int idx2m[(MAXVIEWS*MAXVIEWS-1)/2];
-	}
+		enum
+		{
 
+		};
+	};
 
-	struct TransforamtionErrorEstimator
+	struct TransforamtionErrorEstimator : public TransformationBaseKernel
 	{
 		enum
 		{
 			dx = 32,
-			dy = 16,
-			WARP_SIZE = 32,
+			dy = 32,
 
 			dbx = 0,
 			dby = 0,
 			dbtid = 0,
+
+			tx = 32,
+
+			FloatingPointAdjustment = 1,
+
+			ForgroundOnly = 1,
+			BlaisLevine = 0,
 		};
 
 		float4 *coords;
 		float4 *normals;
-		SensorInfo *sinfo;
+//		SensorInfo *sinfo;
+		SensorInfoV2 *sinfo;
 
 		unsigned int n_rsac;
+		unsigned int n_view;
+
 		float *transformation_matrices;
-		int *transformationMetaData;
+//		int *transformationMetaData;
 
 		float *output_errorTable;
 		unsigned int *output_errorListIdx;
@@ -63,170 +79,85 @@ namespace device
 		float dist_threshold;
 		float angle_threshold;
 
-//	    __device__ __forceinline__ float
-//	    dotf43(const float4& v1,const float4& v2)
-//	    {
-//	      return v1.x * v2.x + v1.y*v2.y + v1.z*v2.z;
-//	    }
-//
-//	    __device__ __forceinline__ float
-//	    lengthf43(const float4& v)
-//	    {
-//	      return sqrt(dotf43(v, v));
-//	    }
 
 		__device__ __forceinline__ void
 		operator () () const
 		{
-//			__shared__ unsigned int shm_matrix_dimx;
-			__shared__ unsigned int shm_length;
-//			__shared__ unsigned int shm_off;
-
-			__shared__ int shm_idx[32];
-			__shared__ float shm_tm[32*12];
+//			__shared__ int shm_transform_idx[WARP_SIZE];
+			__shared__ float shm_transformMatrix[WARP_SIZE*TMatrixDim];
 
 			__shared__ float shm_error_buffer[dx*dy];
 			__shared__ unsigned int shm_valid_points_buffer[dx*dy];
 
-			if(blockIdx.x==0 && blockIdx.y==0 && threadIdx.x==0 && threadIdx.y==0)
-				printf("daaaaaaa!! \n");
+			__shared__ unsigned int view_src;
+			__shared__ unsigned int view_target;
 
 			unsigned int tid = threadIdx.y*blockDim.x+threadIdx.x;
 
-//			if(blockIdx.x==dbx && blockIdx.y==dby && tid==0)
-//				printf("dimx: %d dimy: %d \n",blockDim.x,blockDim.y);
-//
-//
-//			shm_error_buffer[tid] = 1.0f;
-//			__syncthreads();
-//
-//			float sum = 0.f;
-//			if(dx*dy>=1024) { if(tid < 512) { 	shm_error_buffer[tid] +=  shm_error_buffer[tid+512];	} 	__syncthreads(); }
-//
-//			if(blockIdx.x==dbx && blockIdx.y==dby && tid==dbtid)
-//			{
-//				printf("errorList inBlock: ");
-//				for(int io=0;io<dx*dy;io++)
-//				{
-//					printf("(%d/%f) | ",io,shm_error_buffer[io]);
-//				}
-//				printf("\n");
-//			}
-//
-//			if(dx*dy>=512) 	{ if(tid < 256) { 	shm_error_buffer[tid] +=  shm_error_buffer[tid+256]; } 	__syncthreads(); }
-//
-//			if(blockIdx.x==dbx && blockIdx.y==dby && tid==dbtid)
-//			{
-//				printf("errorList inBlock: ");
-//				for(int io=0;io<dx*dy;io++)
-//				{
-//					printf("(%d/%f) | ",io,shm_error_buffer[io]);
-//				}
-//				printf("\n");
-//			}
-//
-//
-//			if(dx*dy>=256) 	{ if(tid < 128) { 	shm_error_buffer[tid] += shm_error_buffer[tid+128];
-////														shm_valid_points_buffer[tid] = sum_points = sum_points + shm_valid_points_buffer[tid + 128];
-//											} 	__syncthreads(); }
-//
-//			if(dx*dy>=128) 	{ if(tid < 64) 	{ 	shm_error_buffer[tid] += shm_error_buffer[tid+64];
-////														shm_valid_points_buffer[tid] = sum_points = sum_points + shm_valid_points_buffer[tid + 64];
-//											} 	__syncthreads(); }
-//
-//			if(tid < 32)
-//			{
-//				volatile float *smem = shm_error_buffer;
-//				if(dx*dy>=64) 	{ 	smem[tid] += smem[tid+32];}
-//				if(dx*dy>=32) 	{ 	smem[tid] += smem[tid+16];
-////											smem_points[tid] = sum_points = sum_points + smem_points[tid+16];
-//				}
-//				if(dx*dy>=16) 	{ 	smem[tid] += smem[tid+8];
-////											smem_points[tid] = sum_points = sum_points + smem_points[tid+8];
-//				}
-//				if(dx*dy>=8) 	{ 	smem[tid] += smem[tid+4];
-////											smem_points[tid] = sum_points = sum_points + smem_points[tid+4];
-//				}
-//				if(dx*dy>=4) 	{ 	smem[tid] += smem[tid+2];
-////											smem_points[tid] = sum_points = sum_points + smem_points[tid+2];
-//				}
-//				if(dx*dy>=2) 	{ 	smem[tid] += smem[tid+1];
-////											smem_points[tid] = sum_points = sum_points + smem_points[tid+1];
-//				}
-//
-//				if(tid==0)
-//				{
-//
-//				}
-//
-//				if(blockIdx.x==dbx && blockIdx.y==dby && tid==dbtid)
-//					printf("(%d) block_sum: %f \n",0,shm_error_buffer[0]);
-////							printf("(%d) block_sum: %f block_point_sum: %d \n",i,sum,smem_points[tid]);
-//
-//			}
-
-
-			if(blockIdx.x==0 && blockIdx.y==0 && tid == 0)
-				printf("inkernel! \n");
-
-			if(tid==0){
-				shm_length = transformationMetaData[0];
-				if(blockIdx.x==0 && blockIdx.y==0) printf("length_inkernel %d \n",shm_length);
+			if(tid==0)
+			{
+				unsigned int x = blockIdx.z;
+				unsigned int y = 0;
+				unsigned int i = 1;
+				while(x >= n_view - i)
+				{
+					x -= n_view-i;
+					i++;
+					y++;
+				}
+				view_src = y;
+				view_target = x+y+1;
 			}
-			__syncthreads();
 
 			unsigned int sx = blockIdx.x*blockDim.x+threadIdx.x;
 			unsigned int sy = blockIdx.y*blockDim.y+threadIdx.y;
 
-			//TODO match blockidx.z to view_src
-			float4 pos = coords[blockIdx.z*640*480+sy*640+sx];
-			float4 normal = normals[blockIdx.z*640*480+sy*640+sx];
+			__syncthreads();
+			float4 pos = coords[view_src*640*480+sy*640+sx];
+			float4 normal = normals[view_src*640*480+sy*640+sx];
 
 
-			for(int soff=0;soff<shm_length;soff+=32)
-//			for(int soff=0;soff<32;soff+=32)
+			for(int soff=0;soff<n_rsac;soff+=32)
 			{
-//				if(blockIdx.x==1 && blockIdx.y==2 && threadIdx.x==10 && threadIdx.y == 5)
+
+//				if(tid<32 && (tid+soff<n_rsac) )
 //				{
-//					printf("round: %d \n",soff/32);
-////					printf("%d \n",transformationMetaData[0]);
-////					printf("matrix_dim_x: %d",matrix_dim_x);
+//					shm_transform_idx[tid] = transformationMetaData[blockIdx.z*n_rsac+tid+soff];
 //				}
-
-
-				if(tid<32 && (tid+soff<shm_length) )
-				{
-					shm_idx[tid] = transformationMetaData[1+blockIdx.z*n_rsac+tid+soff];
-				}
-				__syncthreads();
+//				__syncthreads();
 
 				if(blockIdx.x==0 && blockIdx.y==0 && tid < 32)
 				{
-					output_errorListIdx[blockIdx.z*n_rsac+soff+tid] = shm_idx[tid];
+					output_errorListIdx[blockIdx.z*n_rsac+soff+tid] = soff+tid;
 				}
 				__syncthreads();
 
-				for(int t = tid;t<WARP_SIZE*12;t+=blockDim.x*blockDim.y)
+				for(int t = tid;t<tx*TMatrixDim;t+=blockDim.x*blockDim.y)
 				{
-					unsigned int wid = t/WARP_SIZE;
-					unsigned int wtid = t - wid*WARP_SIZE;
+					unsigned int trans_id = t/tx;
+					unsigned int trans_tid = t - trans_id*tx;
 
-					if(wid+soff<shm_length)
-					{
-						unsigned int idx = shm_idx[wtid];
-						shm_tm[wid*32+wtid] = transformation_matrices[(blockIdx.z*12+wid)*n_rsac+idx];
-					}
+					shm_transformMatrix[trans_id*tx+trans_tid] = transformation_matrices[blockIdx.z*TMatrixDim*n_rsac+trans_id*n_rsac+soff+trans_tid];//transformation_matrices[(blockIdx.z*12+wid)*n_rsac+idx];
+
 				}
 				__syncthreads();
 
-//				if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid)
+//				if(blockIdx.x==0 && blockIdx.y==0 && blockIdx.z==0 && tid==0 && soff==0)
 //				{
-//					printf("(%d) transform data loaded! \n",soff);
+//					for(int i=0;i<WARP_SIZE;i++)
+//					{
+//						printf("IK: %d -> ",soff+i);
+//						for(int d=0;d<TMatrixDim;d++)
+//						{
+//							printf("%f | ",shm_transformMatrix[d*WARP_SIZE+i]);
+//						}
+//						printf("\n");
+//					}
 //				}
 
 
 
-				for(int i=0; (i<WARP_SIZE) && (soff+i < shm_length) ;i++)
+				for(int i=0; (i<tx) && (soff+i < n_rsac) ;i++)
 				{
 //					__syncthreads();
 
@@ -235,32 +166,35 @@ namespace device
 
 
 					float3 pos_m,n_m;
-					pos_m.x = shm_tm[0*32+i]*pos.x + shm_tm[1*32+i]*pos.y + shm_tm[2*32+i]*pos.z + shm_tm[9*32+i];
-					pos_m.y = shm_tm[3*32+i]*pos.x + shm_tm[4*32+i]*pos.y + shm_tm[5*32+i]*pos.z + shm_tm[10*32+i];
-					pos_m.z = shm_tm[6*32+i]*pos.x + shm_tm[7*32+i]*pos.y + shm_tm[8*32+i]*pos.z + shm_tm[11*32+i];
+					pos_m.x = shm_transformMatrix[0*32+i]*pos.x + shm_transformMatrix[1*32+i]*pos.y + shm_transformMatrix[2*32+i]*pos.z + shm_transformMatrix[9*32+i];
+					pos_m.y = shm_transformMatrix[3*32+i]*pos.x + shm_transformMatrix[4*32+i]*pos.y + shm_transformMatrix[5*32+i]*pos.z + shm_transformMatrix[10*32+i];
+					pos_m.z = shm_transformMatrix[6*32+i]*pos.x + shm_transformMatrix[7*32+i]*pos.y + shm_transformMatrix[8*32+i]*pos.z + shm_transformMatrix[11*32+i];
 
-					if(pos.z != 0 && pos_m.z != 0 && !isReconstructed(pos.w))
+					if(pos.z != 0 && pos_m.z != 0 && !isReconstructed(pos.w) && (!ForgroundOnly || isForeground(pos.w)) )
 					{
 
-						n_m.x = shm_tm[0*32+i]*normal.x + shm_tm[1*32+i]*normal.y+ shm_tm[2*32+i]*normal.z;
-						n_m.y = shm_tm[3*32+i]*normal.x + shm_tm[4*32+i]*normal.y+ shm_tm[5*32+i]*normal.z;
-						n_m.z = shm_tm[6*32+i]*normal.x + shm_tm[7*32+i]*normal.y+ shm_tm[8*32+i]*normal.z;
+						n_m.x = shm_transformMatrix[0*32+i]*normal.x + shm_transformMatrix[1*32+i]*normal.y+ shm_transformMatrix[2*32+i]*normal.z;
+						n_m.y = shm_transformMatrix[3*32+i]*normal.x + shm_transformMatrix[4*32+i]*normal.y+ shm_transformMatrix[5*32+i]*normal.z;
+						n_m.z = shm_transformMatrix[6*32+i]*normal.x + shm_transformMatrix[7*32+i]*normal.y+ shm_transformMatrix[8*32+i]*normal.z;
+
+//
+//						int ix = (int) (((pos_m.x*120.f)/(0.2084f*pos_m.z))+320);
+//						int iy = (int) (((pos_m.y*120.f)/(0.2084f*pos_m.z))+240);
 
 
-						int cx = (int) (((pos_m.x*120.f)/(0.2084f*pos_m.z))+320);
-						int cy = (int) (((pos_m.y*120.f)/(0.2084f*pos_m.z))+240);
-
+						int ix = (int) ((pos_m.x*sinfo[view_target].fx)/pos_m.z + sinfo[view_target].cx);
+						int iy = (int) ((pos_m.y*sinfo[view_target].fy)/pos_m.z + sinfo[view_target].cy);
 
 	//						if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
 	//							printf("%d %d -> %d %d | %f \n",cx,cy,cx,cy);
 	//
 
-						if(cx>0 && cx<640 && cy>0 && cy<480)
+						if(ix>=0 && ix<640 && iy>=0 && iy<480)
 						{
-							float4 pos_d = coords[1*640*480+cy*640+cx];
-							float4 n_d = normals[1*640*480+cy*640+cx];
+							float4 pos_d = coords[view_target*640*480+iy*640+ix];
+							float4 n_d = normals[view_target*640*480+iy*640+ix];
 
-							if( pos_d.z != 0 && !isReconstructed(pos_d.w))
+							if( pos_d.z != 0 && !isReconstructed(pos_d.w) && (!ForgroundOnly || isForeground(pos_d.w)) )
 							{
 	//								continue;
 
@@ -277,16 +211,24 @@ namespace device
 	//							shm_error_buffer[tid] = dist_threshold;
 	//							shm_valid_points_buffer[tid] = 1;
 
-								validPoint = true;
+								if(BlaisLevine)
+									validPoint = true;
 
-								//TODO: Bring angle back
-								if( norm(dv) < dist_threshold)// && (((angle>=0)?angle:-angle) < angle_threshold) )
+								if( norm(dv) < dist_threshold && ( angle >= angle_threshold) )
 								{
+									validPoint = true;
+
 									error = dv.x*n_d.x + dv.y*n_d.y + dv.z*n_d.z;
 									error *= error;
-									if(error>dist_threshold)
-										error = dist_threshold;
-	//								if(error<dist_threshold)
+
+									if(BlaisLevine)
+									{
+										if(error>dist_threshold)
+											error = dist_threshold;
+
+									}
+//
+//									if(error<dist_threshold)
 	//									shm_error_buffer[tid] = error;
 
 	//								if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
@@ -303,7 +245,7 @@ namespace device
 					}
 					__syncthreads();
 
-					shm_error_buffer[tid] = error;
+					shm_error_buffer[tid] = error / ((float)FloatingPointAdjustment);
 					shm_valid_points_buffer[tid] = validPoint;
 					__syncthreads();
 
@@ -375,6 +317,14 @@ namespace device
 							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = shm_error_buffer[0];
 							output_validPointsTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = shm_valid_points_buffer[0];
 
+//							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = blockIdx.y*gridDim.x+blockIdx.x;//shm_error_buffer[0];
+//							output_validPointsTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = soff+i;//shm_valid_points_buffer[0];
+
+
+
+//							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = 1;//shm_error_buffer[0];
+//							output_validPointsTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = 1;//shm_valid_points_buffer[0];
+
 //							output_errorList[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = blockIdx.y*gridDim.x+blockIdx.x;
 //							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = i/(gridDim.x*gridDim.y);
 //							output_errorList[(i)*gridDim.y*gridDim.x+blockIdx.y*gridDim.x+blockIdx.x] = smem[0];
@@ -405,6 +355,7 @@ namespace device
 		enum
 		{
 			dx = blockSize,
+			Relative = 1,
 		};
 
 		float *input_errorTable;
@@ -423,24 +374,24 @@ namespace device
 		{
 	    	__shared__ float shm_error[dx];
 	    	__shared__ unsigned int shm_points[dx];
-	    	__shared__ unsigned int shm_length;
+//	    	__shared__ unsigned int shm_length;
 
 
 	    	unsigned int tid = threadIdx.x;
 	    	unsigned int i = tid;
 
-	    	if(tid==0)
-	    	{
-	    		shm_length = listMetaData[0];
-//	    		printf("sumKernel:length: %d \n",shm_length);
-	    	}
+//	    	if(tid==0)
+//	    	{
+//	    		shm_length = listMetaData[0];
+////	    		printf("sumKernel:length: %d \n",shm_length);
+//	    	}
 
-	    	__syncthreads();
-	    	if(blockIdx.x>shm_length)
-	    	{
-	    		output_errorList[(blockIdx.y*n_rsac+blockIdx.x)] = numeric_limits<float>::max();
-				return;
-	    	}
+//	    	__syncthreads();
+//	    	if(blockIdx.x>n_rsac)
+//	    	{
+//	    		output_errorList[(blockIdx.y*n_rsac+blockIdx.x)] = numeric_limits<float>::max();
+//				return;
+//	    	}
 
 	    	float sum = 0.f;
 	    	unsigned int sum_points = 0;
@@ -504,11 +455,11 @@ namespace device
 
 	    		if(tid==0)
 	    		{
-	    			output_errorList[(blockIdx.y*n_rsac)+blockIdx.x] = (sum>0.f && sum_points >= min_overlap)? sum/sum_points : numeric_limits<float>::max();
+	    			output_errorList[(blockIdx.z*n_rsac)+blockIdx.x] = (sum>0.f && sum_points >= min_overlap)? sum/((Relative)?sum_points:1.f) : numeric_limits<float>::max();
 	    		}
 
-	    		if(blockIdx.x == 10 && tid == 0)
-	    			printf("sum_error: %f | sum_validPoints: %d \n",sum,sum_points);
+//	    		if(blockIdx.x == 2 && tid == 0)
+//	    			printf("sum_error: %f | sum_validPoints: %d \n",sum,sum_points);
 	    	}
 
 
@@ -518,22 +469,22 @@ namespace device
 
 
 	template<unsigned int bx>
-	struct ErrorListMinimumPicker
+	struct ErrorListMinimumPicker : public TransformationBaseKernel
 	{
 		enum
 		{
 			dx = bx,
 		};
 
-		float *errorList;
-		unsigned int *errorListIdx;
-		float *transformationMatrices;
+		float *input_errorList;
+		unsigned int *input_errorListIdx;
+		float *input_transformationMatrices;
 
 		float *output_minimumErrorTransformationMatrices;
 
 //		unsigned int gxy;
 		unsigned int n_rsac;
-		unsigned int n_views;
+//		unsigned int n_views;
 
 		__device__ __forceinline__ void
 		operator () () const
@@ -562,21 +513,21 @@ namespace device
 
 	    	while(i<n_rsac)
 	    	{
-	    		float tmp = errorList[blockIdx.x*n_rsac+i];
+	    		float tmp = input_errorList[blockIdx.x*n_rsac+i];
 	    		if(tmp==0.f) printf("%d \n",(blockIdx.x*n_rsac+i));
 	    		if(tmp<min)
 	    		{
 	    			min = tmp;
-	    			minIdx = errorListIdx[blockIdx.x*n_rsac+i];
+	    			minIdx = input_errorListIdx[blockIdx.x*n_rsac+i];
 	    		}
 	    		if((i+dx) < n_rsac )
 	    		{
-	    			tmp = errorList[blockIdx.x*n_rsac+i+dx];
+	    			tmp = input_errorList[blockIdx.x*n_rsac+i+dx];
 	    			if(tmp==0.f) printf("%d \n",(blockIdx.x*n_rsac+i+dx));
 	    			if(tmp<min)
 	    			{
 	    				min = tmp;
-	    				minIdx = errorListIdx[blockIdx.x*n_rsac+i+dx];
+	    				minIdx = input_errorListIdx[blockIdx.x*n_rsac+i+dx];
 	    			}
 	    		}
 
@@ -612,24 +563,27 @@ namespace device
 	    		if(dx>=4)	{ float tmp = smem[tid + 2]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 2]; 	} }
 	    		if(dx>=2)	{ float tmp = smem[tid + 1]; 	if(tmp<min) { smem[tid] = min = tmp; smemIdx[tid] = minIdx = smemIdx[tid + 1]; 	} }
 
-	    		if(tid==0)
-	    		{
-	    			printf("min_kernel: %f \n",min);
-	    			if(min==0.f) printf("!!!\n");
-	    		}
+//	    		if(tid==0)
+//	    		{
+//	    			printf("min_kernel: %f \n",min);
+//	    			if(min==0.f) printf("!!!\n");
+//	    		}
 
 	    	}
 	    	__syncthreads();
 	    	if(tid<12)
 	    	{
-	    		output_minimumErrorTransformationMatrices[(n_views*(n_views-1)/2)*tid + blockIdx.x] = transformationMatrices[(blockIdx.x*12+tid)*n_rsac+shm_idx[0]];
+	    		output_minimumErrorTransformationMatrices[blockIdx.x*TMatrixDim+tid] = input_transformationMatrices[blockIdx.x*TMatrixDim*n_rsac + tid*n_rsac + shm_idx[0]];
 	    	}
 //
     		if(tid==0)
     		{
-//	    			printf("min_kernel: %f \n",min);
-    			output_minimumErrorTransformationMatrices[(n_views*(n_views-1)/2)*12 + blockIdx.x] = min;
-    			errorListIdx[0] = minIdx;
+	    		printf("min_kernel: idx %d -> %f \n",minIdx,min);
+//	    		for(int k=0;k<12;k++)
+//	    			printf("%f | ",input_transformationMatrices[blockIdx.x*TMatrixDim*n_rsac + k*n_rsac + shm_idx[0]]);
+//    			printf("\n");
+//	    		output_minimumErrorTransformationMatrices[gridDim.x*12 + blockIdx.x] = min;
+//    			input_errorListIdx[0] = minIdx;
     		}
 
 
@@ -649,50 +603,79 @@ TranformationValidator::init()
 	transformationErrorestimator.normals = (float4 *)getInputDataPointer(Normals);
 
 	//TODO: set to constant memory??
-	transformationErrorestimator.sinfo = (SensorInfo *)getInputDataPointer(SensorInfoList);
-
+	transformationErrorestimator.sinfo = (SensorInfoV2 *)getInputDataPointer(SensorInfoListV2);
 	transformationErrorestimator.transformation_matrices = (float *)getInputDataPointer(TransforamtionMatrices);
-	transformationErrorestimator.transformationMetaData = (int *)getInputDataPointer(TransformationInfoList);
 
-	transformationErrorestimator.output_errorTable = (float *)getTargetDataPointer(ErrorTable);
-	transformationErrorestimator.output_validPointsTable = (unsigned int *)getTargetDataPointer(ValidPointsTable);
-	transformationErrorestimator.output_errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
-	transformationErrorestimator.n_rsac = n_rsac;
-	transformationErrorestimator.dist_threshold = 50;
-	transformationErrorestimator.angle_threshold = 0.0f;
+//	transformationErrorestimator.output_errorTable = (float *)getTargetDataPointer(ErrorTable);
+//	transformationErrorestimator.output_validPointsTable = (unsigned int *)getTargetDataPointer(ValidPointsTable);
+//	transformationErrorestimator.output_errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
 
 
-	errorListSumcalculator256.input_errorTable = (float *)getTargetDataPointer(ErrorTable);
-	errorListSumcalculator256.input_validPoints = (unsigned int *)getTargetDataPointer(ValidPointsTable);
-	errorListSumcalculator256.output_errorList = (float *)getTargetDataPointer(ErrorList);
-	errorListSumcalculator256.listMetaData = (int *)getInputDataPointer(TransformationInfoList);
-	errorListSumcalculator256.gxy = grid.x * grid.y;
-	errorListSumcalculator256.n_rsac = n_rsac;
-	errorListSumcalculator256.min_overlap = (640*480)/20;
 
-
-	errorListMinimumPicker256.errorList = (float *)getTargetDataPointer(ErrorList);
-	errorListMinimumPicker256.errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
-
-	errorListMinimumPicker256.transformationMatrices = (float *)getInputDataPointer(TransforamtionMatrices);
+//	errorListSumcalculator256.input_errorTable = (float *)getTargetDataPointer(ErrorTable);
+//	errorListSumcalculator256.input_validPoints = (unsigned int *)getTargetDataPointer(ValidPointsTable);
+//	errorListSumcalculator256.output_errorList = (float *)getTargetDataPointer(ErrorList);
+//	errorListSumcalculator256.listMetaData = (int *)getInputDataPointer(TransformationInfoList);
+//	errorListSumcalculator256.gxy = grid.x * grid.y;
+//	errorListSumcalculator256.n_rsac = n_rsac;
+//	errorListSumcalculator256.min_overlap = (640*480)/20;
+//
+//
+//	errorListMinimumPicker256.errorList = (float *)getTargetDataPointer(ErrorList);
+//	errorListMinimumPicker256.errorListIdx = (unsigned int *)getTargetDataPointer(ErrorListIndices);
+//
+	errorListMinimumPicker256.input_transformationMatrices = (float *)getInputDataPointer(TransforamtionMatrices);
 	errorListMinimumPicker256.output_minimumErrorTransformationMatrices = (float *)getTargetDataPointer(MinimumErrorTransformationMatrices);
-//	errorListMinimumPicker256.gxy = grid.x * grid.y;
-	errorListMinimumPicker256.n_rsac = n_rsac;
-	errorListMinimumPicker256.n_views = n_views;
+////	errorListMinimumPicker256.gxy = grid.x * grid.y;
+//	errorListMinimumPicker256.n_rsac = n_rsac;
+//	errorListMinimumPicker256.n_views = n_views;
 
 
 }
 
 void TranformationValidator::execute()
 {
-
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	device::computeTransformationError<<<grid,block>>>(transformationErrorestimator);
+	unsigned int view_combinations = (n_views*(n_views-1))/2;
+	printf("TranformationValidatorInfo: n_rsac: %d | view_combinstaions: %d \n",n_rsac,view_combinations);
+
+	dim3 transformErrorBlock(transformationErrorestimator.dx,transformationErrorestimator.dy);
+	dim3 transformErrorGrid(640/transformErrorBlock.x,480/transformErrorBlock.y,view_combinations);
+
+	thrust::device_vector<float> d_errorTable( view_combinations * n_rsac * transformErrorGrid.x * transformErrorGrid.y);
+	thrust::device_vector<unsigned int> d_validPointsTable(view_combinations * n_rsac * transformErrorGrid.x * transformErrorGrid.y);
+	thrust::device_vector<unsigned int> d_errorListIdx( view_combinations * n_rsac);
+
+
+	transformationErrorestimator.output_errorTable = thrust::raw_pointer_cast(d_errorTable.data());
+	transformationErrorestimator.output_validPointsTable = thrust::raw_pointer_cast(d_validPointsTable.data());
+	transformationErrorestimator.output_errorListIdx = thrust::raw_pointer_cast(d_errorListIdx.data());
+
+
+	transformationErrorestimator.n_rsac = n_rsac;
+	transformationErrorestimator.dist_threshold = 50.f;
+	transformationErrorestimator.angle_threshold = cos(M_PI/4);
+
+	printf("transformErrorBlock:(%d/%d) | transformErrorGrid:(%d/%d/%d) \n",transformErrorBlock.x,transformErrorBlock.y,transformErrorGrid.x,transformErrorGrid.y,transformErrorGrid.z);
+	device::computeTransformationError<<<transformErrorGrid,transformErrorBlock>>>(transformationErrorestimator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+
+
+//	thrust::host_vector<float> h_errorTable = d_errorTable;
+//	thrust::host_vector<unsigned int> h_validPointsTable = d_validPointsTable;
+//	for(int r=0;r<5;r++)
+//	{
+//		for(int j=0;j<transformErrorGrid.x*transformErrorGrid.y;j++)
+//		{
+//			printf("(%f/%d) | ",h_errorTable[r*transformErrorGrid.x*transformErrorGrid.y+j],h_validPointsTable[r*transformErrorGrid.x*transformErrorGrid.y+j]);
+////			printf("(%f) | ",h_errorTable[r*transformErrorGrid.x*transformErrorGrid.y+j]);
+//		}
+//		printf("\n");
+//	}
 
 
 //	int load = 10;
@@ -710,9 +693,22 @@ void TranformationValidator::execute()
 //	}
 
 
-	device::computeErrorListSum<<<n_rsac,errorListSumcalculator256.dx>>>(errorListSumcalculator256);
+	thrust::device_vector<float> d_errorList(view_combinations*n_rsac);
+	errorListSumcalculator256.output_errorList = thrust::raw_pointer_cast(d_errorList.data());
+
+	errorListSumcalculator256.input_errorTable = thrust::raw_pointer_cast(d_errorTable.data());
+	errorListSumcalculator256.input_validPoints = thrust::raw_pointer_cast(d_validPointsTable.data());
+	errorListSumcalculator256.gxy = transformErrorGrid.x*transformErrorGrid.y;
+	errorListSumcalculator256.n_rsac = n_rsac;
+	errorListSumcalculator256.min_overlap = (unsigned int)(640*480*0.1f);
+
+	dim3 sumErrorListGrid(n_rsac,1,view_combinations);
+
+	device::computeErrorListSum<<<sumErrorListGrid,errorListSumcalculator256.dx>>>(errorListSumcalculator256);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+
 
 //	int load = 10;
 //	float *h_tmp2 = (float *)malloc(load*sizeof(float));
@@ -736,12 +732,18 @@ void TranformationValidator::execute()
 //	checkCudaErrors(cudaMemcpy(errorListMinimumPicker256.errorList,h_tmp3,load3*sizeof(float),cudaMemcpyHostToDevice));
 
 
+	errorListMinimumPicker256.input_errorList = thrust::raw_pointer_cast(d_errorList.data());
+	errorListMinimumPicker256.input_errorListIdx = thrust::raw_pointer_cast(d_errorListIdx.data());
+	errorListMinimumPicker256.n_rsac = n_rsac;
+//
+//	dim3 minErrorListPickerGrid(n_rsac,1,view_combinations);
 
-	device::estimateMinimumErrorTransformation<<<1,errorListMinimumPicker256.dx>>>(errorListMinimumPicker256);
+	device::estimateMinimumErrorTransformation<<<view_combinations,errorListMinimumPicker256.dx>>>(errorListMinimumPicker256);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	int load4 = 13;
+
+	int load4 = 12;
 	float *h_tmp4 = (float *)malloc(load4*sizeof(float));
 	checkCudaErrors( cudaMemcpy(h_tmp4,errorListMinimumPicker256.output_minimumErrorTransformationMatrices,load4*sizeof(float),cudaMemcpyDeviceToHost));
 
@@ -751,11 +753,25 @@ void TranformationValidator::execute()
 		printf("%f | ",h_tmp4[i]);
 	}
 	printf("\n");
-	printf("min_error: %f \n",h_tmp4[12]);
+//	printf("min_error: %f \n",h_tmp4[12]);
 
 
 
+	thrust::device_ptr<float> dptr_finalTransform = thrust::device_pointer_cast(errorListMinimumPicker256.output_minimumErrorTransformationMatrices);
+	thrust::device_vector<float> d_finalTransformations(dptr_finalTransform.get(),dptr_finalTransform.get()+12*view_combinations);
+	thrust::device_vector<float> h_finalTransformations = d_finalTransformations;
 
+	float *data = h_finalTransformations.data().get();
+	printf("size: %d \n",h_finalTransformations.size());
+	for(int v=0;v<view_combinations;v++)
+	{
+		printf("v: %d --> ",v);
+		for(int i=0;i<12;i++)
+		{
+			printf("%f | ",data[v*12+i]);
+		}
+		printf("\n");
+	}
 
 }
 
@@ -763,63 +779,63 @@ TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int
 : n_views(n_views), n_rsac(n_rsac)
 {
 
-	block = dim3(transformationErrorestimator.dx,transformationErrorestimator.dy);
-	grid = dim3(640/block.x,480/block.y);
+//	block = dim3(transformationErrorestimator.dx,transformationErrorestimator.dy);
+//	grid = dim3(640/block.x,480/block.y);
 
-	DeviceDataParams errorTableParams;
-	errorTableParams.elements = ((n_views-1)*n_views)/2 * n_rsac * grid.x * grid.y;
-	errorTableParams.element_size = sizeof(float);
-	errorTableParams.elementType = FLOAT1;
-	errorTableParams.dataType = Point;
-	addTargetData(addDeviceDataRequest(errorTableParams),ErrorTable);
-
-	DeviceDataParams validPointsTableParams;
-	validPointsTableParams.elements = ((n_views-1)*n_views)/2 * n_rsac * grid.x * grid.y;
-	validPointsTableParams.element_size = sizeof(unsigned int);
-	validPointsTableParams.elementType = UINT1;
-	validPointsTableParams.dataType = Point;
-	addTargetData(addDeviceDataRequest(validPointsTableParams),ValidPointsTable);
+//	DeviceDataParams errorTableParams;
+//	errorTableParams.elements = ((n_views-1)*n_views)/2 * n_rsac * grid.x * grid.y;
+//	errorTableParams.element_size = sizeof(float);
+//	errorTableParams.elementType = FLOAT1;
+//	errorTableParams.dataType = Point;
+//	addTargetData(addDeviceDataRequest(errorTableParams),ErrorTable);
+//
+//	DeviceDataParams validPointsTableParams;
+//	validPointsTableParams.elements = ((n_views-1)*n_views)/2 * n_rsac * grid.x * grid.y;
+//	validPointsTableParams.element_size = sizeof(unsigned int);
+//	validPointsTableParams.elementType = UINT1;
+//	validPointsTableParams.dataType = Point;
+//	addTargetData(addDeviceDataRequest(validPointsTableParams),ValidPointsTable);
 
 //	printf("elements: %d \gxy",errorListParams.elements);
 
-	DeviceDataParams errorListParams;
-	errorListParams.elements = ((n_views-1)*n_views)/2 * n_rsac;
-	errorListParams.element_size = sizeof(float);
-	errorListParams.elementType = FLOAT1;
-	errorListParams.dataType = Point;
-	addTargetData(addDeviceDataRequest(errorListParams),ErrorList);
+//	DeviceDataParams errorListParams;
+//	errorListParams.elements = ((n_views-1)*n_views)/2 * n_rsac;
+//	errorListParams.element_size = sizeof(float);
+//	errorListParams.elementType = FLOAT1;
+//	errorListParams.dataType = Point;
+//	addTargetData(addDeviceDataRequest(errorListParams),ErrorList);
+//
+//
+//	DeviceDataParams errorListIdxParams;
+//	errorListIdxParams.elements = ((n_views-1)*n_views)/2 * n_rsac;
+//	errorListIdxParams.element_size = sizeof(unsigned int);
+//	errorListIdxParams.elementType = UINT1;
+//	errorListIdxParams.dataType = Indice;
+//	addTargetData(addDeviceDataRequest(errorListIdxParams),ErrorListIndices);
 
-
-	DeviceDataParams errorListIdxParams;
-	errorListIdxParams.elements = ((n_views-1)*n_views)/2 * n_rsac;
-	errorListIdxParams.element_size = sizeof(unsigned int);
-	errorListIdxParams.elementType = UINT1;
-	errorListIdxParams.dataType = Indice;
-	addTargetData(addDeviceDataRequest(errorListIdxParams),ErrorListIndices);
-
-	unsigned int length = (MAXVIEWS*(MAXVIEWS-1))/2;
-	unsigned int h_idx2d[length];
-	unsigned int h_idx2m[length];
-
-	{
-		unsigned i = 0;
-		for(int iy=0;iy<n_views;iy++)
-		{
-			for(int ix = iy+1; ix<n_views;ix++)
-			{
-				h_idx2d[i]=ix;
-				h_idx2m[i]=iy;
-				i++;
-			}
-		}
-	}
-
-	cudaMemcpyToSymbol(device::constant::idx2d,&h_idx2d,length*sizeof(unsigned int));
-	cudaMemcpyToSymbol(device::constant::idx2m,&h_idx2m,length*sizeof(unsigned int));
+//	unsigned int length = (MAXVIEWS*(MAXVIEWS-1))/2;
+//	unsigned int h_idx2d[length];
+//	unsigned int h_idx2m[length];
+//
+//	{
+//		unsigned i = 0;
+//		for(int iy=0;iy<n_views;iy++)
+//		{
+//			for(int ix = iy+1; ix<n_views;ix++)
+//			{
+//				h_idx2d[i]=ix;
+//				h_idx2m[i]=iy;
+//				i++;
+//			}
+//		}
+//	}
+//
+//	cudaMemcpyToSymbol(device::constant::idx2d,&h_idx2d,length*sizeof(unsigned int));
+//	cudaMemcpyToSymbol(device::constant::idx2m,&h_idx2m,length*sizeof(unsigned int));
 
 	DeviceDataParams minErrorTransformationMatricesParams;
 	minErrorTransformationMatricesParams.elements = ((n_views-1)*n_views)/2;
-	minErrorTransformationMatricesParams.element_size = 13 * sizeof(float);
+	minErrorTransformationMatricesParams.element_size = 12 * sizeof(float);
 	minErrorTransformationMatricesParams.elementType = FLOAT1;
 	minErrorTransformationMatricesParams.dataType = Matrix;
 	addTargetData(addDeviceDataRequest(minErrorTransformationMatricesParams),MinimumErrorTransformationMatrices);
@@ -836,7 +852,7 @@ void
 TranformationValidator::TestMinimumPicker()
 {
 	printf("TestMinimumPicker! \n");
-//	checkCudaErrors(cudaMalloc((void **)&errorListMinimumPicker256.errorList,n_rsac*sizeof(float)));
+//	checkCudaErrors(cudaMalloc((void **)&errorListMinimumPicker256.input_errorList,n_rsac*sizeof(float)));
 
 	thrust::default_random_engine rng(1234L);
 	thrust::uniform_real_distribution<float> dist(0, 64);
@@ -853,11 +869,11 @@ TranformationValidator::TestMinimumPicker()
 
 	thrust::device_vector<float> d_data = h_data;
 	thrust::device_vector<unsigned int> d_idx = h_idx;
-	errorListMinimumPicker256.errorList = thrust::raw_pointer_cast(d_data.data());
-	errorListMinimumPicker256.errorListIdx = thrust::raw_pointer_cast(d_idx.data());
+	errorListMinimumPicker256.input_errorList = thrust::raw_pointer_cast(d_data.data());
+	errorListMinimumPicker256.input_errorListIdx = thrust::raw_pointer_cast(d_idx.data());
 
 	errorListMinimumPicker256.n_rsac = n_rsac;
-	errorListMinimumPicker256.n_views = n_views;
+//	errorListMinimumPicker256.n_views = n_views;
 
 	thrust::device_vector<float> d_output(13);
 	errorListMinimumPicker256.output_minimumErrorTransformationMatrices = thrust::raw_pointer_cast(d_output.data());
@@ -935,7 +951,7 @@ TranformationValidator::TestTransform()
 	d_metaData[0]=n_rsac;
 
 	transformationErrorestimator.transformation_matrices = thrust::raw_pointer_cast(d_transformation_matricesStubs.data());
-	transformationErrorestimator.transformationMetaData = thrust::raw_pointer_cast(d_metaData.data());
+//	transformationErrorestimator.transformationMetaData = thrust::raw_pointer_cast(d_metaData.data());
 
 
 	thrust::device_vector<float> d_errorTable(n_rsac*grid.x*grid.y);
@@ -957,6 +973,7 @@ TranformationValidator::TestTransform()
 	{
 		printf("(%d/%f) | ",(int)i,h_errorTable[i*grid.x*grid.y+17]);
 	}
+
 
 
 /*
@@ -1018,7 +1035,7 @@ TranformationValidator::TestTransformError(thrust::host_vector<float4> v0,thrust
 
 
 	transformationErrorestimator.transformation_matrices = thrust::raw_pointer_cast(d_transformation_matrices.data());
-	transformationErrorestimator.transformationMetaData = thrust::raw_pointer_cast(d_metaData.data());
+//	transformationErrorestimator.transformationMetaData = thrust::raw_pointer_cast(d_metaData.data());
 
 	thrust::device_vector<float> d_errorTable(n_rsac*grid.x*grid.y);
 	thrust::device_vector<unsigned int> d_validPointsTable(n_rsac*grid.x*grid.y);

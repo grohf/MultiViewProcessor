@@ -35,9 +35,11 @@
  *
  */
 
+// This is a modified version of the utils.hpp from the PCL kinfu
+// TODO:LINK!!!
 
-#ifndef PCL_GPU_KINFU_CUDA_UTILS_HPP_
-#define PCL_GPU_KINFU_CUDA_UTILS_HPP_
+#ifndef UTILS_HPP
+#define UTILS_HPP
 
 
 namespace device
@@ -68,6 +70,12 @@ namespace device
 //      __device__ __forceinline__ static short
 //      max() { return SHRT_MAX; };
 //    };
+
+    __device__ __forceinline__ float3
+    fetchToFloat3(const float4& v)
+    {
+    	return *(float3 *)&v;
+    }
       
     __device__ __forceinline__ float
     dot(const float3& v1, const float3& v2)
@@ -139,7 +147,7 @@ namespace device
      __device__ __forceinline__ void 
      computeRoots3(float c0, float c1, float c2, float3& roots)
      {
-       if ( fabsf(c0) < numeric_limits<float>::epsilon())// one root is 0 -> quadratic equation
+       if (false&& fabsf(c0) < numeric_limits<float>::epsilon())// one root is 0 -> quadratic equation
        {
          computeRoots2 (c2, c1, roots);
        }
@@ -625,4 +633,4 @@ namespace device
     };
 }
 
-#endif /* PCL_GPU_KINFU_CUDA_UTILS_HPP_ */
+#endif /* UTILS_HPP */
