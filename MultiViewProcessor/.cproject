@@ -46,6 +46,11 @@
 									<listOptionValue builtIn="false" value="freenect_sync"/>
 									<listOptionValue builtIn="false" value="freenect"/>
 									<listOptionValue builtIn="false" value="curand"/>
+									<listOptionValue builtIn="false" value="cula_core"/>
+									<listOptionValue builtIn="false" value="cula_lapack"/>
+								</option>
+								<option id="nvcc.linker.option.paths.1387429018" superClass="nvcc.linker.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/usr/local/cula/lib64"/>
 								</option>
 								<inputType id="nvcc.linker.input.1718933632" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -115,6 +120,11 @@
 									<listOptionValue builtIn="false" value="freenect_sync"/>
 									<listOptionValue builtIn="false" value="freenect"/>
 									<listOptionValue builtIn="false" value="curand"/>
+									<listOptionValue builtIn="false" value="cula_core"/>
+									<listOptionValue builtIn="false" value="cula_lapack"/>
+								</option>
+								<option id="nvcc.linker.option.paths.1690076304" superClass="nvcc.linker.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/usr/local/cula/lib64"/>
 								</option>
 								<inputType id="nvcc.linker.input.760090362" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -186,6 +196,11 @@
 									<listOptionValue builtIn="false" value="freenect_sync"/>
 									<listOptionValue builtIn="false" value="freenect"/>
 									<listOptionValue builtIn="false" value="curand"/>
+									<listOptionValue builtIn="false" value="cula_core"/>
+									<listOptionValue builtIn="false" value="cula_lapack"/>
+								</option>
+								<option id="nvcc.linker.option.paths.385644934" superClass="nvcc.linker.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/usr/local/cula/lib64"/>
 								</option>
 								<inputType id="nvcc.linker.input.364420984" superClass="nvcc.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -226,13 +241,22 @@
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cpp.656687760">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023;com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023.;nvcc.compiler.base.962153482;nvcc.compiler.input.c.2131864213">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
+		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.c.1446234031">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cu.279360062">
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023;com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023.;nvcc.compiler.base.962153482;nvcc.compiler.input.cu.1228095799">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023;com.nvidia.cuda.ide.configuration.debug.2094567131.1299288023.;nvcc.compiler.base.962153482;nvcc.compiler.input.cpp.1976783971">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.cpp.1591562129">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.release.1171689871;com.nvidia.cuda.ide.configuration.release.1171689871.;nvcc.compiler.base.919459099;nvcc.compiler.input.cu.279360062">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.configuration.debug.2094567131;com.nvidia.cuda.ide.configuration.debug.2094567131.;nvcc.compiler.base.934870997;nvcc.compiler.input.c.993397056">

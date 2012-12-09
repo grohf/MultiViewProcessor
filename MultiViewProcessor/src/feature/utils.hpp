@@ -41,6 +41,8 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <thrust/device_vector.h>
+#include <thrust/remove.h>
 
 namespace device
 {
@@ -631,6 +633,15 @@ namespace device
 #endif
       }
     };
+
+//    template<typename T>
+//    size_t remove()
+//    {
+//    	thrust::device_vector<int> d_test(10);
+//    	thrust::remove(d_test.data(),d_test.data()+10,-1);
+//
+//    	return 0;
+//    }
 }
 
 #endif /* UTILS_HPP */

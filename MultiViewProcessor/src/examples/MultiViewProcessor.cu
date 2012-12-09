@@ -40,6 +40,7 @@
 #include "../feature/RigidBodyTransformationAdvancedEstimatior.h"
 #include "../feature/TranformationValidator.h"
 #include "../feature/SimpleNormalEstimator.h"
+#include "../feature/GlobalFineRegistrationEstimator.h"
 
 #include "../include/point_info.hpp"
 
@@ -259,6 +260,39 @@ void TestTransformationerror()
 	src->~SyncFreenectSource();
 }
 
+
+void TestGlobalFineRegistration()
+{
+	Processor p;
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false);
+	p.setSource(SourcePtr(src));
+
+	ATrousFilter *atrousfilter = new ATrousFilter(2,3,30,0,2);
+	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
+	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
+	atrousfilter->setPointIntensity(src->getIntensity());
+	p.addFilter(atrousfilter);
+
+	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(2);
+	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFilter(seg);
+
+	SimpleNormalEstimator *sne = new SimpleNormalEstimator(2);
+	sne->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(sne);
+
+	GlobalFineRegistrationEstimator *gfre = new GlobalFineRegistrationEstimator(2);
+	gfre->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	gfre->setPointNormals(sne->getNormals());
+	gfre->setSensorInfoList(src->getSensorV2InfoList());
+	gfre->setTransformationmatrices(src->getGroundTruthTransformation());
+
+	p.addFeature(gfre);
+
+	p.start();
+
+}
+
 void TestSynthInput()
 {
 	Processor p;
@@ -287,7 +321,7 @@ void TestSynthInput()
 
 
 
-/*
+
 
 	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(2,50);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
@@ -320,7 +354,7 @@ void TestSynthInput()
 	validator->setTransformationmatrices(transform->getTransformationMatrices());
 
 	p.addFeature(validator);
-*/
+
 
 	p.start();
 
@@ -449,7 +483,8 @@ int main(int argc, char **argv) {
 
 
 //	TesterFct();
-	TestSynthInput();
+//	TestSynthInput();
+	TestGlobalFineRegistration();
 
 
 //	runMultiViewTest();

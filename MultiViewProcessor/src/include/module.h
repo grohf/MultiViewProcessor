@@ -23,6 +23,7 @@ namespace device
 		enum
 		{
 			WARP_SIZE = 32,
+//			ForgroundOnly = 1,
 		};
 	};
 }

@@ -13,7 +13,7 @@
 #include <helper_cuda.h>
 #include <helper_image.h>
 
-#include <thrust/remove.h>
+//#include <thrust/remove.h>
 #include <thrust/copy.h>
 #include <thrust/random.h>
 #include <thrust/sort.h>
@@ -27,7 +27,7 @@
 
 #include "point_info.hpp"
 
-
+#include "device_thrust_utils.hpp"
 #include "../sink/pcd_io.h"
 #include "utils.hpp"
 #include "device_utils.hpp"
@@ -1451,83 +1451,85 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 		}
 	}
 
-	thrust::device_vector<int> d_validTransformationRota = d_validTransforms;
-	thrust::device_vector<int> d_validTransformationTrans = d_validTransforms;
+//	thrust::device_vector<int> d_validTransformationRota = d_validTransforms;
+//	thrust::device_vector<int> d_validTransformationTrans = d_validTransforms;
+//
+//	size_t size1 = 0;
+//	size_t size2 = 0;
+//	for(int v=0;v<view_combinations;v++)
+//	{
+//
+//		size1 += thrust::remove_if(
+//		thrust::make_zip_iterator(
+//		thrust::make_tuple(
+//				d_validTransformationRota.data()+v*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+0*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength)),
+//
+//		thrust::make_zip_iterator(
+//		thrust::make_tuple(
+//				d_validTransformationRota.data()+(v+1)*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+9*errorListLength)),
+//
+//				is_not_valid_transform<float>()) -
+//
+//		thrust::make_zip_iterator(
+//		thrust::make_tuple(
+//				d_validTransformationRota.data()+v*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+0*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
+//				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength));
+//
+//		size2 += thrust::remove_if(
+//			thrust::make_zip_iterator(
+//			thrust::make_tuple(
+//					d_validTransformationTrans.data()+v*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+9*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength)),
+//
+//			thrust::make_zip_iterator(
+//			thrust::make_tuple(
+//					d_validTransformationTrans.data()+(v+1)*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+12*errorListLength)),
+//
+//					is_not_valid_transform<float>()) -
+//
+//			thrust::make_zip_iterator(
+//			thrust::make_tuple(
+//					d_validTransformationTrans.data()+v*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+9*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
+//					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength));
+//	}
 
-	size_t size1 = 0;
-	size_t size2 = 0;
-	for(int v=0;v<view_combinations;v++)
-	{
+	size_t size1 = remove_bad_transformations(d_validTransforms, d_transformMatrices, errorListLength, view_combinations);
 
-		size1 += thrust::remove_if(
-		thrust::make_zip_iterator(
-		thrust::make_tuple(
-				d_validTransformationRota.data()+v*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+0*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength)),
-
-		thrust::make_zip_iterator(
-		thrust::make_tuple(
-				d_validTransformationRota.data()+(v+1)*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+9*errorListLength)),
-
-				is_not_valid_transform<float>()) -
-
-		thrust::make_zip_iterator(
-		thrust::make_tuple(
-				d_validTransformationRota.data()+v*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+0*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+1*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+2*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+3*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+4*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+5*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+6*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+7*errorListLength,
-				d_transformMatrices.data()+v*errorListLength*12+8*errorListLength));
-
-		size2 += thrust::remove_if(
-			thrust::make_zip_iterator(
-			thrust::make_tuple(
-					d_validTransformationTrans.data()+v*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+9*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength)),
-
-			thrust::make_zip_iterator(
-			thrust::make_tuple(
-					d_validTransformationTrans.data()+(v+1)*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+12*errorListLength)),
-
-					is_not_valid_transform<float>()) -
-
-			thrust::make_zip_iterator(
-			thrust::make_tuple(
-					d_validTransformationTrans.data()+v*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+9*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+10*errorListLength,
-					d_transformMatrices.data()+v*errorListLength*12+11*errorListLength));
-	}
-
-	thrust::host_vector<int> h_validTransformation_out = d_validTransformationRota;
-	thrust::host_vector<int> h_validTransformationTransform_out = d_validTransformationTrans;
+	thrust::host_vector<int> h_validTransformation_out = d_validTransforms;
+//	thrust::host_vector<int> h_validTransformationTransform_out = d_validTransformationTrans;
 	thrust::host_vector<float> h_transformMatrices_out = d_transformMatrices;
 
 	printf("size: %d \n",size1);
