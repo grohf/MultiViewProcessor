@@ -290,61 +290,64 @@ NormalPCAEstimator::execute()
 	/* Test */
 
 	char path[50];
-	for(int v=0;v<n_view;v++)
+	if(outputlevel>1)
 	{
-		float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
-		checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output+v*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-
-		uchar4 *h_uc4 = (uchar4 *)malloc(640*480*sizeof(uchar4));
-		for(int i=0;i<640*480;i++)
+		for(int v=0;v<n_view;v++)
 		{
-			if(h_f4_normals[i].w >= 0)
+			float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
+			checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output+v*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+
+			uchar4 *h_uc4 = (uchar4 *)malloc(640*480*sizeof(uchar4));
+			for(int i=0;i<640*480;i++)
 			{
-				h_uc4[i].x = (h_f4_normals[i].x+1.0f)*127.f;
-				h_uc4[i].y = (h_f4_normals[i].y+1.0f)*127.f;
-				h_uc4[i].z = (h_f4_normals[i].z+1.0f)*127.f;
-				h_uc4[i].w = 127.f;
-			}
-			else
-			{
-				h_uc4[i].x = 0;
-				h_uc4[i].y = 0;
-				h_uc4[i].z = 0;
-				h_uc4[i].w = 127.f;
+				if(h_f4_normals[i].w >= 0)
+				{
+					h_uc4[i].x = (h_f4_normals[i].x+1.0f)*127.f;
+					h_uc4[i].y = (h_f4_normals[i].y+1.0f)*127.f;
+					h_uc4[i].z = (h_f4_normals[i].z+1.0f)*127.f;
+					h_uc4[i].w = 127.f;
+				}
+				else
+				{
+					h_uc4[i].x = 0;
+					h_uc4[i].y = 0;
+					h_uc4[i].z = 0;
+					h_uc4[i].w = 127.f;
+				}
+
 			}
 
-		}
+			sprintf(path,"/home/avo/pcds/normals_pca_%d.ppm",v);
+			sdkSavePPM4ub(path,(unsigned char *)h_uc4,640,480);
 
-		sprintf(path,"/home/avo/pcds/normals_pca_%d.ppm",v);
-		sdkSavePPM4ub(path,(unsigned char *)h_uc4,640,480);
-
-		uchar4 *h_curv = (uchar4 *)malloc(640*480*sizeof(uchar4));
-		for(int i=0;i<640*480;i++)
-		{
-			if(h_f4_normals[i].w >= 0.0f && h_f4_normals[i].w < 0.03f)
+			uchar4 *h_curv = (uchar4 *)malloc(640*480*sizeof(uchar4));
+			for(int i=0;i<640*480;i++)
 			{
-				h_curv[i].x = 255;
-				h_curv[i].y = 0;
-				h_curv[i].z = 0;
-				h_curv[i].w = 127.f;
-			}
-			else
-			{
-					h_curv[i].x = 0;
+				if(h_f4_normals[i].w >= 0.0f && h_f4_normals[i].w < 0.03f)
+				{
+					h_curv[i].x = 255;
 					h_curv[i].y = 0;
 					h_curv[i].z = 0;
 					h_curv[i].w = 127.f;
+				}
+				else
+				{
+						h_curv[i].x = 0;
+						h_curv[i].y = 0;
+						h_curv[i].z = 0;
+						h_curv[i].w = 127.f;
+				}
+
 			}
 
+			sprintf(path,"/home/avo/pcds/curv_pca_%d.ppm",v);
+			sdkSavePPM4ub(path,(unsigned char *)h_curv,640,480);
 		}
-
-		sprintf(path,"/home/avo/pcds/curv_pca_%d.ppm",v);
-		sdkSavePPM4ub(path,(unsigned char *)h_curv,640,480);
 	}
 
 //	char path[50];
-	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
-	checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+//	float4 *h_f4_normals = (float4 *)malloc(640*480*sizeof(float4));
+//	checkCudaErrors(cudaMemcpy(h_f4_normals,normalEstimator.output,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
 //	sprintf(path,"/home/avo/pcds/normals_pca%d.pcd",2);
 //	host::io::PCDIOController ioCtrl;
@@ -360,7 +363,7 @@ NormalPCAEstimator::execute()
 	printf("normals done \n");
 }
 
-NormalPCAEstimator::NormalPCAEstimator(unsigned int n_view_,float distThresh_)
+NormalPCAEstimator::NormalPCAEstimator(unsigned int n_view_,float distThresh_,unsigned int outputlevel) : outputlevel(outputlevel)
 {
 	n_view = n_view_;
 	dist_thresh = distThresh_;

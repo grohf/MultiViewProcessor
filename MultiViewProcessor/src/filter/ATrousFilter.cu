@@ -318,7 +318,8 @@ device::CoordsUpdater coordsUpdater;
 void ATrousFilter::execute()
 {
 
-	printf("iterations: %d  \n",iterations);
+	if(outputlevel>0)
+		printf("atrous iterations: %d  \n",iterations);
 
 	if(iterations > 0)
 	{
@@ -332,7 +333,9 @@ void ATrousFilter::execute()
 
 		for(int l=1;l<iterations;l++)
 		{
-			printf("iteraten: %d \n",l);
+			if(outputlevel>1)
+				printf("iteraten: %d \n",l);
+
 			checkCudaErrors(cudaMemcpy(atrousfilter.input,atrousfilter.output,n_view*640*480*sizeof(float4),cudaMemcpyDeviceToDevice));
 
 			atrousfilter.level = l;
@@ -363,7 +366,6 @@ void ATrousFilter::execute()
 //	checkCudaErrors(cudaGetLastError());
 //	checkCudaErrors(cudaDeviceSynchronize());
 
-
 	size_t uc4s = 640*480*sizeof(uchar4);
 ////	uchar4 *h_uc4_rgb = (uchar4 *)malloc(uc4s);
 ////	checkCudaErrors(cudaMemcpy(h_uc4_rgb,loader.rgba,640*480*sizeof(uchar4),cudaMemcpyDeviceToHost));
@@ -372,33 +374,39 @@ void ATrousFilter::execute()
 ////	sprintf(path,"/home/avo/pcds/src_rgb%d.ppm",0);
 ////	sdkSavePPM4ub(path,(unsigned char*)h_uc4_rgb,640,480);
 ////
-	for(int v=0;v<n_view;v++)
+
+	printf("outputlevel: %d \n",outputlevel);
+	if(outputlevel>1)
 	{
-		float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-		checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output+v*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
-
-		uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
-		for(int i=0;i<640*480;i++)
+		for(int v=0;v<n_view;v++)
 		{
-			unsigned char g = h_f4_depth[i].z/20;
-			h_uc4_depth[i] = make_uchar4(g,g,g,128);
+			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
+			checkCudaErrors(cudaMemcpy(h_f4_depth,atrousfilter.output+v*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
-			if(!device::isValid(h_f4_depth[i].w)) h_uc4_depth[i].x = 255;
+			uchar4 *h_uc4_depth = (uchar4 *)malloc(uc4s);
+			for(int i=0;i<640*480;i++)
+			{
+				unsigned char g = h_f4_depth[i].z/20;
+				h_uc4_depth[i] = make_uchar4(g,g,g,128);
 
-			if(device::isReconstructed(h_f4_depth[i].w)) h_uc4_depth[i].y = 255;
+				if(!device::isValid(h_f4_depth[i].w)) h_uc4_depth[i].x = 255;
+
+				if(device::isReconstructed(h_f4_depth[i].w)) h_uc4_depth[i].y = 255;
+			}
+
+			sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",v);
+			sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 		}
-
-		sprintf(path,"/home/avo/pcds/src_depth_atrous%d.ppm",v);
-		sdkSavePPM4ub(path,(unsigned char*)h_uc4_depth,640,480);
 	}
-
 
 
 
 
 //	 Test
 //		char path[50];
-
+	bool outputPCD = outputlevel>2;
+	if(outputPCD)
+	{
 		for(int i=0;i<n_view;i++)
 		{
 			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
@@ -408,7 +416,7 @@ void ATrousFilter::execute()
 			host::io::PCDIOController pcdIOCtrl;
 			pcdIOCtrl.writeASCIIPCD(path,(float *)h_f4_depth,640*480);
 		}
-
+	}
 
 }
 

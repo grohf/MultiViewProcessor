@@ -9,6 +9,7 @@
 #define EIGENCHECKCLASS_H_
 
 #include <thrust/host_vector.h>
+#include <stdio.h>
 
 class EigenCheckClass {
 
@@ -19,6 +20,17 @@ public:
 //	thrust::host_vector<float> H;
 //	thrust::host_vector<float> T;
 	static thrust::host_vector<float> GT_transformation;
+
+	static char line[100];
+
+	static unsigned int sframe;
+	static unsigned int tframe;
+	static unsigned int binsPerFeature;
+	static float singleCoreespQ;
+	static float setCorrespQ;
+	static float transformationQuality;
+	static float minTransformError;
+
 
 public:
 	EigenCheckClass();
@@ -35,12 +47,20 @@ public:
 
 	static void checkCorrelationQuality(thrust::host_vector<float4> points_view1,thrust::host_vector<float4> points_view2,thrust::host_vector<float> transforamtion,float threshhold);
 
+	static void checkCorrespondancesQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> src_idx,unsigned int s_length,thrust::host_vector<unsigned int> target_idx,unsigned int corresp_list_length,float threshold);
+
 	static void checkCorrespondancesSetQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> csetIdx, thrust::host_vector<unsigned int> cset, unsigned int sets , unsigned int setLength, unsigned int offset, unsigned int modus=0);
 	static void checkCorrespondancesSetCombinationQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> csetIdx, thrust::host_vector<unsigned int> cset, unsigned int sets, unsigned int n_set_combi , unsigned int setLength, unsigned int offset, unsigned int modus=0);
+	static void checkTransformationQuality(thrust::host_vector<float> eTransformation);
 
 	static void checkGlobalFineRegistration(unsigned int n_view,thrust::host_vector<float4> pos);
 
 	static void setGroundTruthTransformation(thrust::host_vector<float> tm);
+
+	static void flushLine(char *fname);
+	static void setFrameValues(unsigned int sframe,unsigned int tframe);
+	static void setBinsPerFeatureCount(unsigned int binCount);
+	static void setMinTransformError(float valid);
 };
 
 #endif /* EIGENCHECKCLASS_H_ */

@@ -18,6 +18,7 @@ class NormalPCAEstimator : public Feature {
 	float dist_thresh;
 
 	unsigned int n_view;
+	unsigned int outputlevel;
 
 	enum Target
 	{
@@ -31,7 +32,7 @@ class NormalPCAEstimator : public Feature {
 
 public:
 
-	NormalPCAEstimator(unsigned int n_view_,float dist_thresh_);
+	NormalPCAEstimator(unsigned int n_view_,float dist_thresh_,unsigned int outputlevel=0);
 	virtual ~NormalPCAEstimator();
 
 	void execute();

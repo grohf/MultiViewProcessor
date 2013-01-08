@@ -32,8 +32,10 @@ class RigidBodyTransformationAdvancedEstimatior : public Feature {
 
 	unsigned int n_view;
 
+	unsigned int outputlevel;
+
 public:
-	RigidBodyTransformationAdvancedEstimatior(unsigned int n_view, unsigned int rn, unsigned int s,unsigned int k);
+	RigidBodyTransformationAdvancedEstimatior(unsigned int n_view, unsigned int rn, unsigned int s,unsigned int k,unsigned int outputlevel = 0);
 	virtual ~RigidBodyTransformationAdvancedEstimatior();
 
 	void init();

@@ -188,8 +188,8 @@ namespace device
 
 			unsigned int target_begin = input_idxLength[view_target-1];
 			unsigned int target_length = input_idxLength[view_target]-target_begin;
-			if(blockIdx.x==0 && tid==0)
-				printf("target length: %d \n",target_length);
+//			if(blockIdx.x==0 && tid==0)
+//				printf("target length: %d \n",target_length);
 			//TODO: handle rest points
 			for(int l=0;l<target_length/global_points_per_sweep;l++)
 //			for(int l=0;l<2;l++)
@@ -1203,10 +1203,13 @@ void
 RigidBodyTransformationAdvancedEstimatior::execute()
 {
 
+//	int outputlevel = 1;
+
 	unsigned int view_combinations = ((n_view-1)*n_view)/2;
 	unsigned int errorListLength = s*20;
 
-	printf("s: %d | errorList: %d | combinations: %d \n",s,errorListLength,view_combinations);
+	if(outputlevel>0)
+		printf("s: %d | errorList: %d | combinations: %d \n",s,errorListLength,view_combinations);
 
 
 	thrust::device_vector<float> d_rndSList(s*view_combinations);
@@ -1225,7 +1228,8 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	dim3 correspBlock(correspondanceList.dx);
 	dim3 correspGrid(s/correspondanceList.local_points_per_block,1,view_combinations);
 
-	printf("correspGrid.x: %d \n",correspGrid.x);
+	if(outputlevel>2)
+		printf("correspGrid.x: %d \n",correspGrid.x);
 
 	curandGenerator_t gen ;
 	checkCudaErrors(curandCreateGenerator(&gen,CURAND_RNG_PSEUDO_DEFAULT));
@@ -1241,6 +1245,19 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	checkCudaErrors(cudaDeviceSynchronize());
 
 
+	//correspTest
+	{
+		EigenCheckClass::setBinsPerFeatureCount(combiErrorList.bins_per_feature);
+		thrust::host_vector<unsigned int> h_s_idx = d_sIdxList;
+		thrust::host_vector<unsigned int> h_t_idx = d_corresp_idx;
+		thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(combiErrorList.input_pos);
+		thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_view*640*480);
+		thrust::device_vector<float4> h_pos = d_pos;
+
+		EigenCheckClass::checkCorrespondancesQualityGT(h_pos,h_s_idx,s,h_t_idx,combiErrorList.corresp_list_length,25.f);
+
+	}
+//	thrust::host_vector<float> h_corresp_prob = d_corresp_prob;
 //	thrust::host_vector<float> h_corresp_prob = d_corresp_prob;
 //	thrust::host_vector<unsigned int> h_cooresp_idx = d_corresp_idx;
 //
@@ -1296,7 +1313,8 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	combiErrorList.output_combinationIdx = thrust::raw_pointer_cast(d_combiErrorIdx.data());
 	combiErrorList.output_combinationCoresspIdx = thrust::raw_pointer_cast(d_combiError_correspListIdx.data());
 
-	printf("combiErrorGrid: %d %d %d \n",combiErrorGrid.x,combiErrorGrid.y,combiErrorGrid.z);
+	if(outputlevel>1)
+		printf("combiErrorGrid: %d %d %d \n",combiErrorGrid.x,combiErrorGrid.y,combiErrorGrid.z);
 
 	device::computeCombinationErrorList<<<combiErrorGrid,combiErrorBlock>>>(combiErrorList);
 	checkCudaErrors(cudaGetLastError());
@@ -1308,113 +1326,117 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	}
 
 
-
-	thrust::host_vector<float> h_combiError = d_combiError;
-	for(int i=0;i<20;i++)
-	{
-		printf("%f | ",h_combiError.data()[i]);
-	}
-	printf("\n");
-
-	thrust::host_vector<unsigned int> h_combiErrorIdx = d_combiErrorIdx;
-	for(int i=0;i<20;i++)
-	{
-		printf("%d | ",h_combiErrorIdx.data()[i]);
-	}
-	printf("\n");
-	thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(combiErrorList.input_pos);
-	thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_view*640*480);
-
-	thrust::device_vector<float4> h_pos = d_pos;
-	thrust::host_vector<unsigned int> h_combiError_correspListIdx = d_combiError_correspListIdx;
-
 	unsigned int n_out = 14;
-	EigenCheckClass::checkCorrespondancesSetQualityGT(h_pos,h_combiErrorIdx,h_combiError_correspListIdx,n_out,combiErrorList.n_corresp,view_combinations*errorListLength*combiErrorList.n_corresp,2);
+//	if(outputlevel>2)
+//	{
+		thrust::host_vector<float> h_combiError = d_combiError;
+//		for(int i=0;i<20;i++)
+//		{
+//			printf("%f | ",h_combiError.data()[i]);
+//		}
+//		printf("\n");
+
+		thrust::host_vector<unsigned int> h_combiErrorIdx = d_combiErrorIdx;
+//		for(int i=0;i<20;i++)
+//		{
+//			printf("%d | ",h_combiErrorIdx.data()[i]);
+//		}
+//		printf("\n");
+
+		thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(combiErrorList.input_pos);
+		thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_view*640*480);
+
+		thrust::device_vector<float4> h_pos = d_pos;
+		thrust::host_vector<unsigned int> h_combiError_correspListIdx = d_combiError_correspListIdx;
+
+		EigenCheckClass::checkCorrespondancesSetQualityGT(h_pos,h_combiErrorIdx,h_combiError_correspListIdx,128,combiErrorList.n_corresp,view_combinations*errorListLength*combiErrorList.n_corresp,0);
 
 
-//	thrust::host_vector<float> tm(12);
-//	EigenCheckClass::setGroundTruthTransformation(tm);
+	//	thrust::host_vector<float> tm(12);
+//		EigenCheckClass::setGroundTruthTransformation(tm);
 
-	char path[100];
-
-	uchar4 *img = (uchar4 *)malloc(640*480*2*sizeof(uchar4));
-	bool output = false;
-	for(int i=0;i<5;i++)
-	{
-		for(int p=0;p<640*480 && output;p++)
+		if(outputlevel>2)
 		{
-			float4 tmpf4 = h_pos[p];
-			unsigned char g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
-			img[p] = make_uchar4(g,g,g,128);
+		char path[100];
 
-			tmpf4 = h_pos[640*480+p];
-			g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
-			img[640*480+p] = make_uchar4(g,g,g,128);
-		}
-
-		unsigned int idx_corresp = h_combiErrorIdx.data()[i];
-//		printf("%d: \n",idx_corresp);
-		idx_corresp *= combiErrorList.n_corresp;
-		for(int c=0;c<combiErrorList.n_corresp;c++)
+		uchar4 *img = (uchar4 *)malloc(640*480*2*sizeof(uchar4));
+		bool output = outputlevel > 3;
+		for(int i=0;i<5;i++)
 		{
-			unsigned int pos_idx = h_combiError_correspListIdx.data()[idx_corresp+c];
-			float4 tmpf4 = h_pos.data()[pos_idx];
-			printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
+			for(int p=0;p<640*480 && output;p++)
+			{
+				float4 tmpf4 = h_pos[p];
+				unsigned char g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
+				img[p] = make_uchar4(g,g,g,128);
+
+				tmpf4 = h_pos[640*480+p];
+				g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
+				img[640*480+p] = make_uchar4(g,g,g,128);
+			}
+
+			unsigned int idx_corresp = h_combiErrorIdx.data()[i];
+	//		printf("%d: \n",idx_corresp);
+			idx_corresp *= combiErrorList.n_corresp;
+			for(int c=0;c<combiErrorList.n_corresp;c++)
+			{
+				unsigned int pos_idx = h_combiError_correspListIdx.data()[idx_corresp+c];
+				float4 tmpf4 = h_pos.data()[pos_idx];
+				printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
+
+				if(output)
+				{
+					uchar4 tuc4;
+					int cg = 255.f;///(c/7+1);
+					int cm = c%7;
+					if(cm==0) tuc4 = make_uchar4(cg,0,0,128);
+					if(cm==1) tuc4 = make_uchar4(0,cg,0,128);
+					if(cm==2) tuc4 = make_uchar4(0,0,cg,128);
+					if(cm==3) tuc4 = make_uchar4(cg,cg,0,128);
+					if(cm==4) tuc4 = make_uchar4(cg,0,cg,128);
+					if(cm==5) tuc4 = make_uchar4(0,cg,cg,128);
+					if(cm==6) tuc4 = make_uchar4(cg,cg,cg,128);
+
+
+					img[pos_idx] = tuc4;
+				}
+			}
+			printf("\n");
+
+			for(int c=0;c<combiErrorList.n_corresp;c++)
+			{
+				unsigned int pos_idx = h_combiError_correspListIdx.data()[view_combinations*errorListLength*combiErrorList.n_corresp+idx_corresp+c];
+				float4 tmpf4 = h_pos.data()[640*480+pos_idx];
+				printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
+
+				if(output)
+				{
+					uchar4 tuc4;
+					int cg = 255.f;///(c/7+1);
+					int cm = c%7;
+					if(cm==0) tuc4 = make_uchar4(cg,0,0,128);
+					if(cm==1) tuc4 = make_uchar4(0,cg,0,128);
+					if(cm==2) tuc4 = make_uchar4(0,0,cg,128);
+					if(cm==3) tuc4 = make_uchar4(cg,cg,0,128);
+					if(cm==4) tuc4 = make_uchar4(cg,0,cg,128);
+					if(cm==5) tuc4 = make_uchar4(0,cg,cg,128);
+					if(cm==6) tuc4 = make_uchar4(cg,cg,cg,128);
+
+
+					img[640*480+pos_idx] = tuc4;
+				}
+
+			}
+			printf("\n ----------------------------------\n");
+
 
 			if(output)
 			{
-				uchar4 tuc4;
-				int cg = 255.f;///(c/7+1);
-				int cm = c%7;
-				if(cm==0) tuc4 = make_uchar4(cg,0,0,128);
-				if(cm==1) tuc4 = make_uchar4(0,cg,0,128);
-				if(cm==2) tuc4 = make_uchar4(0,0,cg,128);
-				if(cm==3) tuc4 = make_uchar4(cg,cg,0,128);
-				if(cm==4) tuc4 = make_uchar4(cg,0,cg,128);
-				if(cm==5) tuc4 = make_uchar4(0,cg,cg,128);
-				if(cm==6) tuc4 = make_uchar4(cg,cg,cg,128);
-
-
-				img[pos_idx] = tuc4;
+				sprintf(path,"/home/avo/pcds/corresp/correspImg_%d_%f.ppm",i,h_combiError.data()[i]);
+				sdkSavePPM4ub(path,(unsigned char*)img,640,480*2);
 			}
 		}
-		printf("\n");
 
-		for(int c=0;c<combiErrorList.n_corresp;c++)
-		{
-			unsigned int pos_idx = h_combiError_correspListIdx.data()[view_combinations*errorListLength*combiErrorList.n_corresp+idx_corresp+c];
-			float4 tmpf4 = h_pos.data()[640*480+pos_idx];
-			printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
-
-			if(output)
-			{
-				uchar4 tuc4;
-				int cg = 255.f;///(c/7+1);
-				int cm = c%7;
-				if(cm==0) tuc4 = make_uchar4(cg,0,0,128);
-				if(cm==1) tuc4 = make_uchar4(0,cg,0,128);
-				if(cm==2) tuc4 = make_uchar4(0,0,cg,128);
-				if(cm==3) tuc4 = make_uchar4(cg,cg,0,128);
-				if(cm==4) tuc4 = make_uchar4(cg,0,cg,128);
-				if(cm==5) tuc4 = make_uchar4(0,cg,cg,128);
-				if(cm==6) tuc4 = make_uchar4(cg,cg,cg,128);
-
-
-				img[640*480+pos_idx] = tuc4;
-			}
-
-		}
-		printf("\n ----------------------------------\n");
-
-
-		if(output)
-		{
-			sprintf(path,"/home/avo/pcds/corresp/correspImg_%d_%f.ppm",i,h_combiError.data()[i]);
-			sdkSavePPM4ub(path,(unsigned char*)img,640,480*2);
-		}
 	}
-
-
 	thrust::device_vector<int> d_validTransforms(errorListLength*view_combinations);
 	thrust::device_vector<float> d_transformMatrices(errorListLength*view_combinations*12);
 
@@ -1431,11 +1453,15 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	dim3 transformBlock(transformEstimator.dx);
 	dim3 transformGrid(errorListLength/transformEstimator.n_matrices,1,view_combinations);
 
-	printf("transformGrid: %d %d %d \n",transformGrid.x,transformGrid.y,transformGrid.z);
+	if(outputlevel>2)
+		printf("transformGrid: %d %d %d \n",transformGrid.x,transformGrid.y,transformGrid.z);
+
 	device::estimateTransformations<<<transformGrid,transformEstimator.dx>>>(transformEstimator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+	if(outputlevel>2)
+	{
 	thrust::host_vector<int> h_validTransforms = d_validTransforms;
 	thrust::host_vector<float> h_transformMatrices = d_transformMatrices;
 	for(int i=0;i<n_out;i++)
@@ -1449,6 +1475,7 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 			}
 			printf("\n");
 		}
+	}
 	}
 
 //	thrust::device_vector<int> d_validTransformationRota = d_validTransforms;
@@ -1528,21 +1555,23 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 
 	size_t size1 = remove_bad_transformations(d_validTransforms, d_transformMatrices, errorListLength, view_combinations);
 
-	thrust::host_vector<int> h_validTransformation_out = d_validTransforms;
-//	thrust::host_vector<int> h_validTransformationTransform_out = d_validTransformationTrans;
-	thrust::host_vector<float> h_transformMatrices_out = d_transformMatrices;
-
-	printf("size: %d \n",size1);
-	for(int i=0;i<10;i++)
+	if(outputlevel>2)
 	{
-		printf(" %d -> %d --> ",i,h_validTransformation_out[i]);
-		for(int m=0;m<12;m++)
-		{
-			printf("%f | ",h_transformMatrices_out[m*errorListLength+i]);
-		}
-		printf("\n");
-	}
+		thrust::host_vector<int> h_validTransformation_out = d_validTransforms;
+	//	thrust::host_vector<int> h_validTransformationTransform_out = d_validTransformationTrans;
+		thrust::host_vector<float> h_transformMatrices_out = d_transformMatrices;
 
+		printf("size: %d \n",size1);
+		for(int i=0;i<10;i++)
+		{
+			printf(" %d -> %d --> ",i,h_validTransformation_out[i]);
+			for(int m=0;m<12;m++)
+			{
+				printf("%f | ",h_transformMatrices_out[m*errorListLength+i]);
+			}
+			printf("\n");
+		}
+	}
 
 	transformCopryKernel.input_transformations = thrust::raw_pointer_cast(d_transformMatrices.data());
 	transformCopryKernel.rn = rn;
@@ -1551,32 +1580,38 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 
 	dim3 copyGrid( (rn*transformCopryKernel.TMatrixDim - 1 )/transformCopryKernel.threads + 1,1,view_combinations);
 
-	printf("rn: %d | copyGrid: %d %d %d \n",rn,copyGrid.x,copyGrid.y,copyGrid.z);
+	if(outputlevel>2)
+		printf("rn: %d | copyGrid: %d %d %d \n",rn,copyGrid.x,copyGrid.y,copyGrid.z);
+
 	device::copyFinalTransformations<<<copyGrid,transformCopryKernel.threads>>>(transformCopryKernel);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-
-	thrust::device_ptr<float> dptr_transformMatrices = thrust::device_pointer_cast(transformCopryKernel.output_transformations);
-
-	thrust::device_vector<float> d_transEnd(dptr_transformMatrices,dptr_transformMatrices+rn*view_combinations*12);
-	thrust::host_vector<float> h_transEnd = d_transEnd;
-
-	for(int i=0;i<10;i++)
+	if(outputlevel>1)
 	{
-		printf("End: %d -> ",i);
-		for(int m=0;m<12;m++)
-		{
-			printf("%f | ",h_transEnd[m*rn+i]);
-		}
-		printf("\n");
-	}
+		thrust::device_ptr<float> dptr_transformMatrices = thrust::device_pointer_cast(transformCopryKernel.output_transformations);
+		thrust::device_vector<float> d_transEnd(dptr_transformMatrices,dptr_transformMatrices+rn*view_combinations*12);
+		thrust::host_vector<float> h_transEnd = d_transEnd;
 
+		int vc = 0;
+//		for(vc=0;vc<view_combinations;vc++)
+		{
+			for(int i=0;i<15;i++)
+			{
+				printf("End: %d -> ",i);
+				for(int m=0;m<12;m++)
+				{
+					printf("%f | ",h_transEnd[vc*12*rn+m*rn+i]);
+				}
+				printf("\n");
+			}
+		}
+	}
 }
 
 
 
-RigidBodyTransformationAdvancedEstimatior::RigidBodyTransformationAdvancedEstimatior(unsigned int n_view, unsigned int rn, unsigned int s,unsigned int k) : n_view(n_view), rn(rn), s(s), k(k)
+RigidBodyTransformationAdvancedEstimatior::RigidBodyTransformationAdvancedEstimatior(unsigned int n_view, unsigned int rn, unsigned int s,unsigned int k, unsigned int outputlevel) : n_view(n_view), rn(rn), s(s), k(k), outputlevel(outputlevel)
 {
 	DeviceDataParams transformationmatrixesParams;
 	transformationmatrixesParams.elements = rn * ((n_view-1)*n_view)/2;

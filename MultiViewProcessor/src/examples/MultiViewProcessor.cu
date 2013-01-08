@@ -293,6 +293,54 @@ void TestGlobalFineRegistration()
 
 }
 
+void TestSynthInput2()
+{
+
+	unsigned int nv = 2;
+	Processor p;
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(nv,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false,false);
+	p.setSource(SourcePtr(src));
+
+
+	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,15,5,0);
+	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
+	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
+	atrousfilter->setPointIntensity(src->getIntensity());
+	p.addFilter(atrousfilter);
+
+	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv);
+	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFilter(seg);
+
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,50,0);
+	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFeature(nPCAestimator);
+
+	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,0);
+	dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
+	p.addFeature(dfpfhEstimator);
+
+	unsigned n_ransac = 128;
+	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,0);
+	transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+	transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
+	transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
+	transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
+	p.addFeature(transform);
+
+	TranformationValidator *validator = new TranformationValidator(nv,n_ransac);
+	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+	validator->setNormals(nPCAestimator->getNormals());
+	validator->setSensorInfoList(src->getSensorV2InfoList());
+	validator->setTransformationmatrices(transform->getTransformationMatrices());
+	p.addFeature(validator);
+
+	p.start();
+
+	EigenCheckClass::flushLine("/home/avo/Desktop/stats3.csv");
+}
+
 void TestSynthInput()
 {
 	Processor p;
@@ -484,7 +532,8 @@ int main(int argc, char **argv) {
 
 //	TesterFct();
 //	TestSynthInput();
-	TestGlobalFineRegistration();
+	TestSynthInput2();
+//	TestGlobalFineRegistration();
 
 
 //	runMultiViewTest();

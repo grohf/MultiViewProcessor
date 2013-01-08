@@ -26,7 +26,7 @@ class ATrousFilter : public Filter {
 	float sigma_intensity;
 
 	unsigned int n_view;
-
+	unsigned int outputlevel;
 	enum Input
 	{
 		WorldCoordinates,
@@ -40,11 +40,11 @@ class ATrousFilter : public Filter {
 	};
 
 public:
-	ATrousFilter(unsigned int n_view_, unsigned int iteration_, float sigma_depth_, float sigma_intensity_, unsigned int radi_=2) :
-		iterations(iteration_), sigma_depth(sigma_depth_), sigma_intensity(sigma_intensity_)
+	ATrousFilter(unsigned int n_view_, unsigned int iteration_, float sigma_depth_, float sigma_intensity_, unsigned int outputlevel = 0) :
+		iterations(iteration_), sigma_depth(sigma_depth_), sigma_intensity(sigma_intensity_), outputlevel(outputlevel)
 	{
 		n_view = n_view_;
-		radi = radi_;
+		radi = 2;
 
 
 		//	DeviceDataParamFunction f = shrinkData;

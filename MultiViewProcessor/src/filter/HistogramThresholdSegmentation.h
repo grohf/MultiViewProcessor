@@ -18,9 +18,10 @@ class HistogramThresholdSegmentation : public Filter {
 	};
 
 	unsigned int n_view;
+	unsigned int outputlevel;
 
 public:
-	HistogramThresholdSegmentation(unsigned int n_view);
+	HistogramThresholdSegmentation(unsigned int n_view,unsigned int outputlevel = 0);
 	virtual ~HistogramThresholdSegmentation();
 
 	void init();

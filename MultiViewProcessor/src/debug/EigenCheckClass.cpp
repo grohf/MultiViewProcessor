@@ -26,7 +26,7 @@ thrust::host_vector<float> EigenCheckClass::GT_transformation;
 EigenCheckClass::EigenCheckClass()
 {
 	// TODO Auto-generated constructor stub
-
+//	sframe = 0;
 }
 
 EigenCheckClass::~EigenCheckClass()
@@ -35,7 +35,48 @@ EigenCheckClass::~EigenCheckClass()
 }
 
 
+unsigned int EigenCheckClass::sframe;
+unsigned int EigenCheckClass::tframe;
+unsigned int EigenCheckClass::binsPerFeature;
+float EigenCheckClass::singleCoreespQ;
+float EigenCheckClass::setCorrespQ;
+float EigenCheckClass::transformationQuality;
+float EigenCheckClass::minTransformError;
 
+void
+EigenCheckClass::flushLine(char *fname)
+{
+	FILE * pFile;
+  pFile = fopen (fname,"a");
+  if (pFile!=NULL)
+  {
+	fprintf(pFile,"%d;%d;%d;%f;%f;%f;%f \n",EigenCheckClass::sframe,EigenCheckClass::tframe,
+			EigenCheckClass::binsPerFeature,EigenCheckClass::singleCoreespQ,EigenCheckClass::setCorrespQ,
+			EigenCheckClass::transformationQuality,EigenCheckClass::minTransformError);
+
+//	  fprintf(pFile,"%d \n",sframe);
+	fclose (pFile);
+  }
+}
+
+void
+EigenCheckClass::setFrameValues(unsigned int sframe,unsigned int tframe)
+{
+	EigenCheckClass::sframe = sframe;
+	EigenCheckClass::tframe = tframe;
+}
+
+void
+EigenCheckClass::setBinsPerFeatureCount(unsigned int binCount)
+{
+	EigenCheckClass::binsPerFeature = binCount;
+}
+
+void
+EigenCheckClass::setMinTransformError(float minTransformError)
+{
+	EigenCheckClass::minTransformError = minTransformError;
+}
 
 void
 EigenCheckClass::testSVD()
@@ -641,8 +682,10 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 		}
 
 		Eigen::Matrix3f r_out = rota.inverse();
+
 //		std::cout << "r_out :\n" << r_out << std::endl;
-//		std::cout << "v_out :\n" << v_out << std::endl;
+//		Eigen::Vector3f re_v_out = rota.inverse() * v_out;
+//		std::cout << "re_v_out :\n" << re_v_out << std::endl;
 
 		for(int t=0;t<9;t++)
 		{
@@ -651,6 +694,16 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 		tranformmatrices[v*12+9] 	= v_out[0]*1000.f;
 		tranformmatrices[v*12+10] 	= v_out[1]*1000.f;
 		tranformmatrices[v*12+11] 	= v_out[2]*1000.f;
+
+
+//		Eigen::Vector3f re_v_out = rota.inverse() * v_out;
+//		for(int t=0;t<9;t++)
+//		{
+//			tranformmatrices[v*12+t] = (rota.data())[t];
+//		}
+//		tranformmatrices[v*12+9] 	= re_v_out[0]*1000.f;
+//		tranformmatrices[v*12+10] 	= re_v_out[1]*1000.f;
+//		tranformmatrices[v*12+11] 	= re_v_out[2]*1000.f;
 	}
 
 	GT_transformation = tranformmatrices;
@@ -687,12 +740,12 @@ EigenCheckClass::checkCorrelationQuality(thrust::host_vector<float4> points_view
 	}
 
 
-	std::cout << "rota1 :\n" << rota1 << std::endl;
-	std::cout << "trans1 :\n" << trans1 << std::endl;
-
-
-	std::cout << "rota2 :\n" << rota2 << std::endl;
-	std::cout << "trans2 :\n" << trans2 << std::endl;
+//	std::cout << "rota1 :\n" << rota1 << std::endl;
+//	std::cout << "trans1 :\n" << trans1 << std::endl;
+//
+//
+//	std::cout << "rota2 :\n" << rota2 << std::endl;
+//	std::cout << "trans2 :\n" << trans2 << std::endl;
 
 	int count = 0;
 	for(int i=0;i<points_view1.size();i++)
@@ -721,9 +774,113 @@ EigenCheckClass::checkCorrelationQuality(thrust::host_vector<float4> points_view
 }
 
 void
+EigenCheckClass::checkCorrespondancesQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> src_idx,unsigned int s_length,thrust::host_vector<unsigned int> target_idx,unsigned int corresp_list_length,float threshold)
+{
+	float *m = EigenCheckClass::GT_transformation.data();
+//	printf("GT_transforms: \n");
+//	for(int i=0;i<EigenCheckClass::GT_transformation.size();i++)
+//	{
+//		printf("%f | ",m[i]);
+//	}
+
+	Eigen::Matrix3f rota0;
+	Eigen::Matrix3f rota1;
+	Eigen::Vector3f trans0;
+	Eigen::Vector3f trans1;
+
+	for(int j=0;j<3;j++)
+	{
+		trans0(j) = m[9+j];
+		trans1(j) = m[12+9+j];
+		for(int i=0;i<3;i++)
+		{
+			rota0(j,i) = m[j*3+i];
+			rota1(j,i) = m[12+j*3+i];
+		}
+	}
+
+//	std::cout << "rota1 :\n" << rota0 << std::endl;
+//	std::cout << "trans1 :\n" << trans0 << std::endl;
+//
+//	std::cout << "rota2 :\n" << rota1 << std::endl;
+//	std::cout << "trans2 :\n" << trans1 << std::endl;
+//
+
+	int count = 0;
+	for(int i=0;i<s_length;i++)
+	{
+		float4 p1 = pos[src_idx[i]];
+		Eigen::Vector3f v0(p1.x,p1.y,p1.z);
+
+		float4 p2 = pos[target_idx[i]];
+		Eigen::Vector3f v1(p2.x,p2.y,p2.z);
+
+		Eigen::Vector3f diff = ((rota0*v0+trans0) - (rota1*v1+trans1));
+
+		if(diff.norm() <= threshold)
+			count++;
+
+//		if(diff.norm() <= 50.f)
+//			printf("%f \n",diff.norm());
+//		printf("s: %d \n",i);
+	}
+
+	printf("count: %d | s: %d \n",count,s_length);
+	singleCoreespQ = ((float)count)/((float)s_length);
+
+}
+
+void
+EigenCheckClass::checkTransformationQuality(thrust::host_vector<float> eTransformation)
+{
+
+	float *m = EigenCheckClass::GT_transformation.data();
+
+//	Eigen::Matrix3f rota0;
+	Eigen::Matrix3f rota1;
+//	Eigen::Vector3f trans0;
+	Eigen::Vector3f trans1;
+
+	for(int j=0;j<3;j++)
+	{
+//		trans0(j) = m[9+j];
+		trans1(j) = m[12+9+j];
+		for(int i=0;i<3;i++)
+		{
+//			rota0(j,i) = m[j*3+i];
+			rota1(j,i) = m[12+j*3+i];
+		}
+	}
+
+	Eigen::Matrix3f rota = rota1.inverse();
+	Eigen::Vector3f re_trans = -1.0f * ( rota1.inverse() * trans1);
+
+
+//	std::cout << "rota1 :\n" << rota0 << std::endl;
+//	std::cout << "re_trans :\n" << re_trans << std::endl;
+//
+//	float tmp1 = re_trans(2);
+//	float tmp2 = eTransformation[11];
+//
+//	printf("tt: %f / %f \n",tmp1,tmp2);
+
+	float sum = 0.f;
+	for(int i=0;i<3;i++)
+	{
+		float tmp = re_trans(i)-eTransformation[9+i];
+		sum = tmp*tmp;
+	}
+	float diff = sqrt(sum);
+
+	printf("eucl_diff: %f \n",diff);
+	transformationQuality = diff;
+}
+
+void
 EigenCheckClass::checkCorrespondancesSetQualityGT(thrust::host_vector<float4> pos, thrust::host_vector<unsigned int> csetIdx, thrust::host_vector<unsigned int> cset, unsigned int sets , unsigned int setLength, unsigned int offset, unsigned int modus)
 {
 	float *m = EigenCheckClass::GT_transformation.data();
+//	printf("GT_transforms: \n");
 //	for(int i=0;i<EigenCheckClass::GT_transformation.size();i++)
 //	{
 //		printf("%f | ",m[i]);
@@ -751,7 +908,7 @@ EigenCheckClass::checkCorrespondancesSetQualityGT(thrust::host_vector<float4> po
 //	std::cout << "rota2 :\n" << rota1 << std::endl;
 //	std::cout << "trans2 :\n" << trans1 << std::endl;
 
-
+	int count = 0;
 	for(int i=0;i<sets;i++)
 	{
 		Eigen::MatrixXf src = Eigen::MatrixXf::Zero(3,setLength);
@@ -759,6 +916,7 @@ EigenCheckClass::checkCorrespondancesSetQualityGT(thrust::host_vector<float4> po
 
 		unsigned int cidx = csetIdx.data()[i];
 
+//		int count = 0;
 		for(int j=0;j<setLength;j++)
 		{
 			unsigned int pidx = cset[cidx*setLength+j];
@@ -772,7 +930,6 @@ EigenCheckClass::checkCorrespondancesSetQualityGT(thrust::host_vector<float4> po
 		}
 //		std::cout << "Here is the vector src :\n" << src << std::endl;
 //		std::cout << "Here is the vector target :\n" << target << std::endl;
-
 
 
 		//Quality of points
@@ -796,8 +953,9 @@ EigenCheckClass::checkCorrespondancesSetQualityGT(thrust::host_vector<float4> po
 			}
 			avgSError = sqrt(avgSError)/setLength;
 			avgError = avgError/setLength;
-			printf("average Error: %f | average Squared Error: %f | maxError: %f \n",avgError,avgSError,maxError);
-
+//			printf("average Error: %f | average Squared Error: %f | maxError: %f \n",avgError,avgSError,maxError);
+			if(maxError<=25.0f)
+				count++;
 		}
 
 		if(modus==1)
@@ -948,7 +1106,10 @@ EigenCheckClass::checkCorrespondancesSetQualityGT(thrust::host_vector<float4> po
 			std::cout << "Here is the vector dt :\n" << dt << std::endl;
 
 		}
+
 	}
+	printf("goodSets: %d / %d \n",count,sets);
+	setCorrespQ = ((float)count)/((float)sets);
 }
 
 void EigenCheckClass::checkCorrespondancesSetCombinationQualityGT(thrust::host_vector<float4> pos,thrust::host_vector<unsigned int> csetIdx, thrust::host_vector<unsigned int> cset, unsigned int sets, unsigned int n_set_combi , unsigned int setLength, unsigned int offset, unsigned int modus)
@@ -1051,3 +1212,4 @@ EigenCheckClass::checkGlobalFineRegistration(unsigned int n_view,thrust::host_ve
 
 
 }
+

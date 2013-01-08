@@ -9,6 +9,10 @@
 #include "lodepng.h"
 #include "point_info.hpp"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -245,11 +249,19 @@ void SynthRGBDBenchmarkSource::loadFrame()
 
 	unsigned int depth_lines[n_view];
 
-//	for(int i=0;i<n_view;i++)
-//		depth_lines[i]=i*50;
+	srand ( time(NULL) );
 
-	depth_lines[0] = 0;
-	depth_lines[1] = 20;
+	depth_lines[0] = (unsigned int) (rand() % 100);
+
+	for(int i=1;i<n_view;i++)
+	{
+		depth_lines[i]= depth_lines[i-1] + (unsigned int) (rand() % 80);
+	}
+
+//	depth_lines[0] = 0;
+//	depth_lines[1] = 20;
+
+	EigenCheckClass::setFrameValues(depth_lines[0],depth_lines[1]);
 
 	std::string base(baseDir);
 	printf("base: %s \n",base.data());

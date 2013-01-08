@@ -29,9 +29,9 @@ class DFPFHEstimator : public Feature {
 	};
 
 	unsigned int n_view;
-
+	unsigned int outputlevel;
 public:
-	DFPFHEstimator(unsigned int n_view);
+	DFPFHEstimator(unsigned int n_view,unsigned int outputlevel=0);
 	virtual ~DFPFHEstimator();
 
 	void init();

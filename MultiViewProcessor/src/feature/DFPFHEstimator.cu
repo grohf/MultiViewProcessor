@@ -603,7 +603,7 @@ namespace device
 	        if(tid==0)
 			{
 	        	output_block_mean[blockIdx.z*bins_n_meta+bins] = shm_count[0];// (shm_count[0]>0)?1.f:0.f;
-	        	printf("count: %f \n",shm_count[0]);
+//	        	printf("count: %f \n",shm_count[0]);
 			}
 
 	        if(shm_count[0]<=0)
@@ -813,7 +813,7 @@ namespace device
 			if(tid==0)
 			{
 				float points = input_mean_data[blockIdx.z*bins_n_meta+bins];
-				printf("(%d) points: %f sigma: %f \n",blockIdx.z,points,sqrtf(shm_buffer[0]/points));
+//				printf("(%d) points: %f sigma: %f \n",blockIdx.z,points,sqrtf(shm_buffer[0]/points));
 				output_sigmas[blockIdx.z] = (points>0)?sqrtf(shm_buffer[0]/points):-1.f;
 			}
 
@@ -1152,6 +1152,9 @@ DFPFHEstimator::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+	if(outputlevel>2)
+		printf("persistence: 1 \n");
+
 	for(int il=2;il<n_radii;il++)
 	{
 		bool toggle = (il%2==0);
@@ -1229,6 +1232,11 @@ DFPFHEstimator::execute()
 		device::computePersistanceDFPFHFeatures<<<dim3((640*480)/persistance.dx,1,n_view),persistance.dx>>>(persistance);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
+
+		if(outputlevel>2)
+			printf("persistence: %d \n",il);
+
+
 	}
 
 
@@ -1267,22 +1275,24 @@ DFPFHEstimator::execute()
 	thrust::copy(d_persistanceMapLength.data(),d_persistanceMapLength.data()+n_view,idxLength_ptr);
 
 
-	printf("length: %d -> %d \n",d_persistance_map.size(),persistanceMapLength);
-	thrust::host_vector<unsigned int> h_persistanceMapLength = d_persistanceMapLength;
-	for(int l=0;l<h_persistanceMapLength.size();l++)
+	if(outputlevel>1)
 	{
-		int length = h_persistanceMapLength.data()[l];
-		printf("%d -> %d \n",l,length);
+		printf("length: %d -> %d \n",d_persistance_map.size(),persistanceMapLength);
+		thrust::host_vector<unsigned int> h_persistanceMapLength = d_persistanceMapLength;
+		for(int l=0;l<h_persistanceMapLength.size();l++)
+		{
+			int length = h_persistanceMapLength.data()[l];
+			printf("%d -> %d \n",l,length);
+		}
+
+		thrust::host_vector<int> h_clearedPersiatnceMap = d_persistance_map;
+		int *dataLength = h_clearedPersiatnceMap.data();
+		int lidx = h_persistanceMapLength.data()[0];
+		printf("%d %d %d \n",dataLength[lidx-1]/(640*480),dataLength[lidx]/(640*480),dataLength[lidx+1]/(640*480));
 	}
 
-	thrust::host_vector<int> h_clearedPersiatnceMap = d_persistance_map;
-	int *dataLength = h_clearedPersiatnceMap.data();
-	int lidx = h_persistanceMapLength.data()[0];
-	printf("%d %d %d \n",dataLength[lidx-1]/(640*480),dataLength[lidx]/(640*480),dataLength[lidx+1]/(640*480));
-
-
 	char path[50];
-	bool output = true;
+	bool output = outputlevel>1;
 	if(output)
 	{
 		thrust::host_vector<int> h_persistance_map = d_persistance_map;
@@ -1341,12 +1351,12 @@ DFPFHEstimator::execute()
 	}
 
 
-	printf("done! \n");
+	printf("done dfpfh! \n");
 }
 
 
 
-DFPFHEstimator::DFPFHEstimator(unsigned int n_view): n_view(n_view)
+DFPFHEstimator::DFPFHEstimator(unsigned int n_view,unsigned int outputlevel): n_view(n_view), outputlevel(outputlevel)
 {
 	DeviceDataParams paramsDFPFH;
 	paramsDFPFH.elements = 640*480*n_view;
