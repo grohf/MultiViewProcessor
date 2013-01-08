@@ -49,7 +49,7 @@
 									<listOptionValue builtIn="false" value="cula_core"/>
 									<listOptionValue builtIn="false" value="cula_lapack"/>
 								</option>
-								<option id="nvcc.linker.option.paths.1387429018" superClass="nvcc.linker.option.paths" valueType="libPaths">
+								<option id="nvcc.linker.option.paths.1387429018" name="Library search path (-L)" superClass="nvcc.linker.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/local/cula/lib64"/>
 								</option>
 								<inputType id="nvcc.linker.input.1718933632" superClass="nvcc.linker.input">
@@ -109,7 +109,7 @@
 									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
 									<listOptionValue builtIn="false" value="/usr/local/cuda/samples/common/inc"/>
 								</option>
-								<option id="nvcc.compiler.maxregcount.464865780" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="32" valueType="string"/>
+								<option id="nvcc.compiler.maxregcount.464865780" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="63" valueType="string"/>
 								<option id="nvcc.compiler.usefastmath.296369860" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="false" valueType="boolean"/>
 								<inputType id="nvcc.compiler.input.cu.279360062" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.656687760" superClass="nvcc.compiler.input.cpp"/>
@@ -123,7 +123,7 @@
 									<listOptionValue builtIn="false" value="cula_core"/>
 									<listOptionValue builtIn="false" value="cula_lapack"/>
 								</option>
-								<option id="nvcc.linker.option.paths.1690076304" superClass="nvcc.linker.option.paths" valueType="libPaths">
+								<option id="nvcc.linker.option.paths.1690076304" name="Library search path (-L)" superClass="nvcc.linker.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/local/cula/lib64"/>
 								</option>
 								<inputType id="nvcc.linker.input.760090362" superClass="nvcc.linker.input">
@@ -199,7 +199,7 @@
 									<listOptionValue builtIn="false" value="cula_core"/>
 									<listOptionValue builtIn="false" value="cula_lapack"/>
 								</option>
-								<option id="nvcc.linker.option.paths.385644934" superClass="nvcc.linker.option.paths" valueType="libPaths">
+								<option id="nvcc.linker.option.paths.385644934" name="Library search path (-L)" superClass="nvcc.linker.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/local/cula/lib64"/>
 								</option>
 								<inputType id="nvcc.linker.input.364420984" superClass="nvcc.linker.input">

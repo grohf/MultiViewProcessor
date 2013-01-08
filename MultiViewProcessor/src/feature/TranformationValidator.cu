@@ -515,7 +515,7 @@ namespace device
 	    	while(i<n_rsac)
 	    	{
 	    		float tmp = input_errorList[blockIdx.x*n_rsac+i];
-	    		if(tmp==0.f) printf("%d \n",(blockIdx.x*n_rsac+i));
+//	    		if(tmp==0.f) printf("%d \n",(blockIdx.x*n_rsac+i));
 	    		if(tmp<min)
 	    		{
 	    			min = tmp;
@@ -524,7 +524,7 @@ namespace device
 	    		if((i+dx) < n_rsac )
 	    		{
 	    			tmp = input_errorList[blockIdx.x*n_rsac+i+dx];
-	    			if(tmp==0.f) printf("%d \n",(blockIdx.x*n_rsac+i+dx));
+//	    			if(tmp==0.f) printf("%d \n",(blockIdx.x*n_rsac+i+dx));
 	    			if(tmp<min)
 	    			{
 	    				min = tmp;
@@ -539,12 +539,12 @@ namespace device
 	    	shm_idx[tid] = minIdx;
 	    	__syncthreads();
 
-	    	if(tid==0)
-	    	{
-	    		for(int i=0;i<dx;i++)
-	    			if(shm_error[i]==0.f) printf("(%d/%f) ",i,shm_error[i]);
-	    		printf("\n");
-	    	}
+//	    	if(tid==0)
+//	    	{
+//	    		for(int i=0;i<dx;i++)
+//	    			if(shm_error[i]==0.f) printf("(%d/%f) ",i,shm_error[i]);
+//	    		printf("\n");
+//	    	}
 
 	    	if(dx>=1024){ if(tid<512) 	{ float tmp = shm_error[tid + 512]; if(tmp<min) { shm_error[tid] = min = tmp; shm_idx[tid] = minIdx = shm_idx[tid + 512]; } } __syncthreads(); }
 	    	if(dx>=512)	{ if(tid<256) 	{ float tmp = shm_error[tid + 256]; if(tmp<min) { shm_error[tid] = min = tmp; shm_idx[tid] = minIdx = shm_idx[tid + 256]; } } __syncthreads(); }
@@ -579,7 +579,7 @@ namespace device
 //
     		if(tid==0)
     		{
-	    		printf("min_kernel (%d): idx %d -> %f \n",blockIdx.x,minIdx,min);
+//	    		printf("min_kernel (%d): idx %d -> %f \n",blockIdx.x,minIdx,min);
 	    		output_minimumError[blockIdx.x] = min;
 //	    		for(int k=0;k<12;k++)
 //	    			printf("%f | ",input_transformationMatrices[blockIdx.x*TMatrixDim*n_rsac + k*n_rsac + shm_idx[0]]);
@@ -641,7 +641,8 @@ void TranformationValidator::execute()
 //	checkCudaErrors(cudaDeviceSynchronize());
 
 	unsigned int view_combinations = (n_views*(n_views-1))/2;
-	printf("TranformationValidatorInfo: n_rsac: %d | view_combinstaions: %d \n",n_rsac,view_combinations);
+	if(outputlevel>2)
+		printf("TranformationValidatorInfo: n_rsac: %d | view_combinstaions: %d \n",n_rsac,view_combinations);
 
 	dim3 transformErrorBlock(transformationErrorestimator.dx,transformationErrorestimator.dy);
 	dim3 transformErrorGrid(640/transformErrorBlock.x,480/transformErrorBlock.y,view_combinations);
@@ -659,8 +660,8 @@ void TranformationValidator::execute()
 	transformationErrorestimator.n_rsac = n_rsac;
 	transformationErrorestimator.dist_threshold = 50.f;
 	transformationErrorestimator.angle_threshold = cos(M_PI/4);
-
-	printf("transformErrorBlock:(%d/%d) | transformErrorGrid:(%d/%d/%d) \n",transformErrorBlock.x,transformErrorBlock.y,transformErrorGrid.x,transformErrorGrid.y,transformErrorGrid.z);
+	if(outputlevel>2)
+		printf("transformErrorBlock:(%d/%d) | transformErrorGrid:(%d/%d/%d) \n",transformErrorBlock.x,transformErrorBlock.y,transformErrorGrid.x,transformErrorGrid.y,transformErrorGrid.z);
 	device::computeTransformationError<<<transformErrorGrid,transformErrorBlock>>>(transformationErrorestimator);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
@@ -748,23 +749,25 @@ void TranformationValidator::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-
-	int load4 = 12*view_combinations;
-	float *h_tmp4 = (float *)malloc(load4*sizeof(float));
-	checkCudaErrors( cudaMemcpy(h_tmp4,errorListMinimumPicker256.output_minimumErrorTransformationMatrices,load4*sizeof(float),cudaMemcpyDeviceToHost));
-
-	printf("final transformation: \n");
-	for(int i=0;i<12;i++)
+	if(outputlevel>1)
 	{
-		printf("%f | ",h_tmp4[i]);
+		int load4 = 12*view_combinations;
+		float *h_tmp4 = (float *)malloc(load4*sizeof(float));
+		checkCudaErrors( cudaMemcpy(h_tmp4,errorListMinimumPicker256.output_minimumErrorTransformationMatrices,load4*sizeof(float),cudaMemcpyDeviceToHost));
+
+		printf("final transformation: \n");
+		for(int i=0;i<12;i++)
+		{
+			printf("%f | ",h_tmp4[i]);
+		}
+		printf("\n");
+	//	printf("min_error: %f \n",h_tmp4[12]);
 	}
-	printf("\n");
-//	printf("min_error: %f \n",h_tmp4[12]);
 
 
 	thrust::host_vector<float> h_minTransformError = d_minTransformError;
 	float minTransformError = h_minTransformError[0];
-	printf("minTransformError: %f \n",minTransformError);
+//	printf("minTransformError: %f \n",minTransformError);
 	EigenCheckClass::setMinTransformError(minTransformError);
 
 	thrust::device_ptr<float> dptr_finalTransform = thrust::device_pointer_cast(errorListMinimumPicker256.output_minimumErrorTransformationMatrices);
@@ -774,23 +777,26 @@ void TranformationValidator::execute()
 	EigenCheckClass::checkTransformationQuality(h_finalTransformations);
 
 //	float *data = h_finalTransformations.data();
-	printf("size: %d \n",h_finalTransformations.size());
-	for(int v=0;v<view_combinations;v++)
+	if(outputlevel>1)
 	{
-		printf("v: %d --> ",v);
-		for(int i=0;i<12;i++)
+		printf("minTransformError: %f \n",minTransformError);
+		printf("size: %d \n",h_finalTransformations.size());
+		for(int v=0;v<view_combinations;v++)
 		{
-//			printf("%f | ",data[v*12+i]);
-			printf("%f | ",(float)h_finalTransformations[v*12+i]);
+			printf("v: %d --> ",v);
+			for(int i=0;i<12;i++)
+			{
+	//			printf("%f | ",data[v*12+i]);
+				printf("%f | ",(float)h_finalTransformations[v*12+i]);
+			}
+			printf("\n");
 		}
-		printf("\n");
 	}
-
 	printf("transformationValidation done! \n");
 }
 
-TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int n_rsac)
-: n_views(n_views), n_rsac(n_rsac)
+TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int n_rsac,unsigned int outputlevel)
+: n_views(n_views), n_rsac(n_rsac), outputlevel(outputlevel)
 {
 
 //	block = dim3(transformationErrorestimator.dx,transformationErrorestimator.dy);

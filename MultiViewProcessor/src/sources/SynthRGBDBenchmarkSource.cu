@@ -135,8 +135,19 @@ namespace device
 
 device::SynthWCLoader synthRGBDLoader;
 
-SynthRGBDBenchmarkSource::SynthRGBDBenchmarkSource(unsigned int n_view_,char *baseDir,bool transform,bool output) : n_view(n_view_), baseDir(baseDir),transform(transform), output(output)
+SynthRGBDBenchmarkSource::SynthRGBDBenchmarkSource(unsigned int n_view_,unsigned int scene,bool transform,bool output) : n_view(n_view_),transform(transform), output(output), scene(scene)
 {
+	switch (scene) {
+		case 0: baseDir = "/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/";
+			break;
+		case 1: baseDir = "/home/avo/Desktop/rgbd_dataset_freiburg3_large_cabinet/";
+			break;
+		case 2: baseDir = "/home/avo/Desktop/rgbd_dataset_freiburg3_cabinet/";
+			break;
+		default: baseDir = "/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/";
+			break;
+	}
+
 	DeviceDataParams imageDepthParams;
 	imageDepthParams.elements = 640*480*n_view;
 	imageDepthParams.element_size = sizeof(float);
@@ -224,7 +235,7 @@ void SynthRGBDBenchmarkSource::init()
 	block = dim3(32,24);
 	grid = dim3(640/block.x,480/block.y,n_view);
 
-
+	EigenCheckClass::setScene(scene);
 
 }
 
@@ -257,6 +268,8 @@ void SynthRGBDBenchmarkSource::loadFrame()
 	{
 		depth_lines[i]= depth_lines[i-1] + (unsigned int) (rand() % 80);
 	}
+
+	printf("sframe: %d | tframe: %d \n",depth_lines[0],depth_lines[1]);
 
 //	depth_lines[0] = 0;
 //	depth_lines[1] = 20;

@@ -30,6 +30,8 @@ public:
 	static float setCorrespQ;
 	static float transformationQuality;
 	static float minTransformError;
+	static float angle;
+	static unsigned int scene;
 
 
 public:
@@ -61,6 +63,7 @@ public:
 	static void setFrameValues(unsigned int sframe,unsigned int tframe);
 	static void setBinsPerFeatureCount(unsigned int binCount);
 	static void setMinTransformError(float valid);
+	static void setScene(unsigned int s);
 };
 
 #endif /* EIGENCHECKCLASS_H_ */

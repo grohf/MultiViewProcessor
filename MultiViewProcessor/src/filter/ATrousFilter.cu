@@ -10,6 +10,8 @@
 #include <helper_cuda.h>
 #include <helper_image.h>
 
+#include <boost/timer.hpp>
+
 #include <thrust/device_vector.h>
 
 #include "point_info.hpp"
@@ -323,6 +325,14 @@ void ATrousFilter::execute()
 
 	if(iterations > 0)
 	{
+
+//		boost::timer t;
+//		cudaEvent_t start,stop;
+//		float time;
+//		cudaEventCreate(&start);
+//		cudaEventCreate(&stop);
+//		cudaEventRecord(start, 0);
+
 		device::filterAtrousKernel<<<grid,block>>>(atrousfilter);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
@@ -330,6 +340,19 @@ void ATrousFilter::execute()
 		device::updateCoords<<<grid,block>>>(coordsUpdater);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
+//		cudaEventRecord(stop, 0);
+//		cudaEventSynchronize(stop);
+//
+//		cudaEventElapsedTime(&time, start, stop);
+//		printf ("Time for the kernel: %f ms\n", time);
+
+
+		if(outputlevel==-1)
+		{
+//			double e = t.elapsed();
+//			printf("e: %g \n",e);
+		}
+
 
 		for(int l=1;l<iterations;l++)
 		{

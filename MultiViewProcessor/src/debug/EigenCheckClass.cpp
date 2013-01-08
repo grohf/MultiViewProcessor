@@ -42,6 +42,8 @@ float EigenCheckClass::singleCoreespQ;
 float EigenCheckClass::setCorrespQ;
 float EigenCheckClass::transformationQuality;
 float EigenCheckClass::minTransformError;
+float EigenCheckClass::angle;
+unsigned int EigenCheckClass::scene;
 
 void
 EigenCheckClass::flushLine(char *fname)
@@ -50,8 +52,18 @@ EigenCheckClass::flushLine(char *fname)
   pFile = fopen (fname,"a");
   if (pFile!=NULL)
   {
-	fprintf(pFile,"%d;%d;%d;%f;%f;%f;%f \n",EigenCheckClass::sframe,EigenCheckClass::tframe,
-			EigenCheckClass::binsPerFeature,EigenCheckClass::singleCoreespQ,EigenCheckClass::setCorrespQ,
+	float rad = acos(EigenCheckClass::angle) * 180 / M_PI;
+	fprintf(pFile,"%d;"
+			"%d;%d;%d;"
+			"%f;"
+			"%d;"
+			"%f;%f;"
+			"%f;%f \n",
+			EigenCheckClass::scene,
+			EigenCheckClass::sframe,EigenCheckClass::tframe,(EigenCheckClass::tframe-EigenCheckClass::sframe),
+			rad,
+			EigenCheckClass::binsPerFeature,
+			EigenCheckClass::singleCoreespQ,EigenCheckClass::setCorrespQ,
 			EigenCheckClass::transformationQuality,EigenCheckClass::minTransformError);
 
 //	  fprintf(pFile,"%d \n",sframe);
@@ -76,6 +88,11 @@ void
 EigenCheckClass::setMinTransformError(float minTransformError)
 {
 	EigenCheckClass::minTransformError = minTransformError;
+}
+
+void EigenCheckClass::setScene(unsigned int s)
+{
+	EigenCheckClass::scene = s;
 }
 
 void
@@ -650,7 +667,9 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 {
 	Eigen::Matrix3f reRota;
 	Eigen::Vector3f reTrans;
-//	Eigen::Matrix4f reTransform = Eigen::Matrix4f::Identity();
+
+	Eigen::Vector3f reEye;
+
 	for(int v=0;v<n_view;v++)
 	{
 //		printf("%d: ",v);
@@ -664,6 +683,9 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 		Eigen::Quaternion<float> q(in_quaternions[v*7+6],in_quaternions[v*7+3],in_quaternions[v*7+4],in_quaternions[v*7+5]);
 //		std::cout << "q1 :\n" << q1.matrix() << std::endl;
 //		std::cout << "q1_inv :\n" << q1.inverse().matrix() << std::endl;
+
+//		Eigen::AngleAxisf aa = Eigen::AngleAxisf(q);
+//		printf("aa: %f \n",aa.angle());
 
 		Eigen::Matrix3f rota = q.matrix();
 		Eigen::Vector3f v_out;
@@ -681,6 +703,21 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 
 		}
 
+//		Eigen::Vector3f z = Eigen::Vector3f::UnitZ();
+		Eigen::Vector3f r = rota * Eigen::Vector3f::UnitZ();
+//		std::cout << "r :\n" << r << std::endl;
+//		std::cout << "r_norm :\n" << r.norm() << std::endl;
+
+		if(v==0)
+		{
+			reEye = r;
+		}
+
+		if(v==1)
+		{
+			float ang = reEye.dot(r);
+			EigenCheckClass::angle = ang;
+		}
 		Eigen::Matrix3f r_out = rota.inverse();
 
 //		std::cout << "r_out :\n" << r_out << std::endl;

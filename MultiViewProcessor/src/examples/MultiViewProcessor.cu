@@ -264,7 +264,7 @@ void TestTransformationerror()
 void TestGlobalFineRegistration()
 {
 	Processor p;
-	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false);
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,0,false);
 	p.setSource(SourcePtr(src));
 
 	ATrousFilter *atrousfilter = new ATrousFilter(2,3,30,0,2);
@@ -293,26 +293,35 @@ void TestGlobalFineRegistration()
 
 }
 
-void TestSynthInput2()
+void TestSynthInput2(char *fpath)
 {
-
+	unsigned int scene = 0;
 	unsigned int nv = 2;
 	Processor p;
-	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(nv,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false,false);
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(nv,scene,false,false);
 	p.setSource(SourcePtr(src));
 
 
-	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,15,5,0);
+	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,0);
 	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 	atrousfilter->setPointIntensity(src->getIntensity());
 	p.addFilter(atrousfilter);
 
-	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv);
+if(scene==0)
+{
+	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,0);
 	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(seg);
+}
+else
+{
+	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,500.f,3500.00f);
+	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+	p.addFilter(truncateThresholdFilter);
+}
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,50,0);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,0);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
@@ -338,13 +347,16 @@ void TestSynthInput2()
 
 	p.start();
 
-	EigenCheckClass::flushLine("/home/avo/Desktop/stats3.csv");
+	char cvsPath[100];
+	sprintf(cvsPath,"%s%s","/home/avo/Desktop/",fpath);
+	printf("cvsPath: %s \n",cvsPath);
+	EigenCheckClass::flushLine(cvsPath);
 }
 
 void TestSynthInput()
 {
 	Processor p;
-	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,"/home/avo/Desktop/rgbd_dataset_freiburg3_teddy/",false);
+	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(2,0,false);
 	p.setSource(SourcePtr(src));
 
 //	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(2);
@@ -529,10 +541,18 @@ int main(int argc, char **argv) {
 
 //	PointInfoTest();
 
+	std::cout << "argc = " << argc << std::endl;
+	for(int i = 0; i < argc; i++)
+	   std::cout << "argv[" << i << "] = " << argv[i] << std::endl;
 
+	char *fpath;
+	if(argc>1)
+		fpath = argv[1];
+	else
+		fpath = "stats_final1.csv";
 //	TesterFct();
 //	TestSynthInput();
-	TestSynthInput2();
+	TestSynthInput2(fpath);
 //	TestGlobalFineRegistration();
 
 

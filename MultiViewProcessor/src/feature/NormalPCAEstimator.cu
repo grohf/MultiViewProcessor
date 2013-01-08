@@ -25,7 +25,7 @@ namespace device
 
 		enum
 		{
-			kxr = 9,
+			kxr = 5,
 			kyr = kxr,
 
 			kx = 32+kxr*2,

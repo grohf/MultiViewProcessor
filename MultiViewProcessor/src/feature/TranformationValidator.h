@@ -39,8 +39,10 @@ class TranformationValidator : public Feature {
 	unsigned int n_views;
 	unsigned int n_rsac;
 
+	unsigned int outputlevel;
+
 public:
-	TranformationValidator(unsigned int n_views,unsigned int n_rsac);
+	TranformationValidator(unsigned int n_views,unsigned int n_rsac,unsigned int outputlevel=0);
 //	: n_views(n_views), n_rsac(n_rsac)
 //	{
 //		DeviceDataParams errorListParams;
