@@ -29,7 +29,10 @@ struct threshold_stats_data
 //    T max;
     T mean1;
     T mean2;
-//    T M2;
+
+    T M1;
+    T M2;
+
 //    T M3;
 //    T M4;
 
@@ -37,11 +40,13 @@ struct threshold_stats_data
     void initialize()
     {
       n1 = n2 = mean1 = mean2 = 0;
+      M1 = M2 = 0;
 //      min = std::numeric_limits<T>::max();
 //      max = std::numeric_limits<T>::min();
     }
 
     T threshold()   { return 0.5 * (mean2 - mean1); }
+    T threshold_var()   { return 0.5 * (M1/(n1-1))/(M2/(n2-1)) * (mean2 - mean1); }
 
 //    T variance()   { return M2 / (n - 1); }
 //    T variance_n() { return M2 / n; }
@@ -58,6 +63,10 @@ struct threshold_stats_unary_op
     threshold_stats_data<T> operator()(const float4 & p) const
     {
          threshold_stats_data<T> result;
+
+         result.M1 = 0;
+         result.M2 = 0;
+
          if(p.z==0)
          {
  			result.n1    = 0;
@@ -131,6 +140,8 @@ struct threshold_stats_binary_op
         result.mean1 =(n1>0)?(x.mean1 + delta1 * y.n1 / n1):0;
         result.mean2 =(n2>0)?(x.mean2 + delta2 * y.n2 / n2):0;
 
+        result.M1  = (n1>0)?x.M1 + y.M1:0;
+        result.M2  = (n2>0)?x.M2 + y.M2:0;
 
 //        result.M2  = x.M2 + y.M2;
 //        result.M2 += delta2 * x.n * y.n / n;

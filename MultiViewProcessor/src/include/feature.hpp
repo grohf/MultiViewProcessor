@@ -20,8 +20,8 @@ namespace device
 		enum
 		{
 			TMatrixDim = 12,
-			features = 3,
-			bins_per_feature = 11,
+			features = 7,
+			bins_per_feature = 3,
 			bins = features * bins_per_feature,
 			bins_n_meta = bins + 1,
 		};

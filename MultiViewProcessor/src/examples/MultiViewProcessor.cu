@@ -27,6 +27,7 @@
 
 #include "../sources/SyncFreenectSource.h"
 #include "../sources/SynthRGBDBenchmarkSource.h"
+#include "../sources/OpenNISource.h"
 #include "../filter/TestFilter.h"
 #include "../filter/TestFilter2.h"
 #include "../filter/ATrousFilter.h"
@@ -293,10 +294,70 @@ void TestGlobalFineRegistration()
 
 }
 
+void RealInput()
+{
+	unsigned int nv = 3;
+		Processor p;
+		OpenNISource *src = new OpenNISource(nv,2);
+		p.setSource(SourcePtr(src));
+
+		ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,5);
+		atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
+		atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
+		atrousfilter->setPointIntensity(src->getIntensity());
+		p.addFilter(atrousfilter);
+
+
+
+//	if(scene==0)
+//	{
+//		HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,2);
+//		seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+//		p.addFilter(seg);
+//	}
+//	else
+//	{
+		TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(nv,500.f,1800.00f);
+		truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+		p.addFilter(truncateThresholdFilter);
+//	}
+
+
+
+		NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,2);
+		nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+		p.addFeature(nPCAestimator);
+
+
+		DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,2);
+		dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
+		dfpfhEstimator->setNormals(nPCAestimator->getNormals());
+		p.addFeature(dfpfhEstimator);
+
+
+
+		unsigned n_ransac = 128;
+		RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,4);
+		transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
+		transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
+		transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
+		transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
+		p.addFeature(transform);
+
+		TranformationValidator *validator = new TranformationValidator(nv,n_ransac,2);
+		validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
+		validator->setNormals(nPCAestimator->getNormals());
+		validator->setSensorInfoList(src->getSensorV2InfoList());
+		validator->setTransformationmatrices(transform->getTransformationMatrices());
+		p.addFeature(validator);
+
+		p.start();
+}
+
 void TestSynthInput2(char *fpath)
 {
 	unsigned int scene = 0;
-	unsigned int nv = 2;
+	unsigned int nv = 3;
 	Processor p;
 	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(nv,scene,false,false);
 	p.setSource(SourcePtr(src));
@@ -310,7 +371,7 @@ void TestSynthInput2(char *fpath)
 
 if(scene==0)
 {
-	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,0);
+	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,3);
 	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(seg);
 }
@@ -321,24 +382,24 @@ else
 	p.addFilter(truncateThresholdFilter);
 }
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,0);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,5);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFeature(nPCAestimator);
 
-	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,0);
+	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,5);
 	dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
 	p.addFeature(dfpfhEstimator);
 
 	unsigned n_ransac = 128;
-	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,0);
+	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,5);
 	transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
 	transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
 	transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
 	p.addFeature(transform);
 
-	TranformationValidator *validator = new TranformationValidator(nv,n_ransac);
+	TranformationValidator *validator = new TranformationValidator(nv,n_ransac,3);
 	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
 	validator->setNormals(nPCAestimator->getNormals());
 	validator->setSensorInfoList(src->getSensorV2InfoList());
@@ -347,10 +408,10 @@ else
 
 	p.start();
 
-	char cvsPath[100];
-	sprintf(cvsPath,"%s%s","/home/avo/Desktop/",fpath);
-	printf("cvsPath: %s \n",cvsPath);
-	EigenCheckClass::flushLine(cvsPath);
+//	char cvsPath[100];
+//	sprintf(cvsPath,"%s%s","/home/avo/Desktop/",fpath);
+//	printf("cvsPath: %s \n",cvsPath);
+//	EigenCheckClass::flushLine(cvsPath);
 }
 
 void TestSynthInput()
@@ -541,9 +602,9 @@ int main(int argc, char **argv) {
 
 //	PointInfoTest();
 
-	std::cout << "argc = " << argc << std::endl;
-	for(int i = 0; i < argc; i++)
-	   std::cout << "argv[" << i << "] = " << argv[i] << std::endl;
+//	std::cout << "argc = " << argc << std::endl;
+//	for(int i = 0; i < argc; i++)
+//	   std::cout << "argv[" << i << "] = " << argv[i] << std::endl;
 
 	char *fpath;
 	if(argc>1)
@@ -552,9 +613,11 @@ int main(int argc, char **argv) {
 		fpath = "stats_final1.csv";
 //	TesterFct();
 //	TestSynthInput();
-	TestSynthInput2(fpath);
+//	TestSynthInput2(fpath);
 //	TestGlobalFineRegistration();
 
+//	TestSynthInput2(fpath);
+	RealInput();
 
 //	runMultiViewTest();
 	return 0;

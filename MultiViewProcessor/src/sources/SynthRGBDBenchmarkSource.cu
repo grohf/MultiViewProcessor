@@ -133,7 +133,7 @@ namespace device
 	__global__ void loadSynthFrame(const SynthWCLoader sfl){ sfl(); }
 }
 
-device::SynthWCLoader synthRGBDLoader;
+device::SynthWCLoader synthWCLoader;
 
 SynthRGBDBenchmarkSource::SynthRGBDBenchmarkSource(unsigned int n_view_,unsigned int scene,bool transform,bool output) : n_view(n_view_),transform(transform), output(output), scene(scene)
 {
@@ -202,12 +202,12 @@ SynthRGBDBenchmarkSource::SynthRGBDBenchmarkSource(unsigned int n_view_,unsigned
 
 void SynthRGBDBenchmarkSource::init()
 {
-	synthRGBDLoader.depth = (float *)getTargetDataPointer(ImageDepth);
-	synthRGBDLoader.rgb = (uint8_t *)getTargetDataPointer(ImageRGB);
+	synthWCLoader.depth = (float *)getTargetDataPointer(ImageDepth);
+	synthWCLoader.rgb = (uint8_t *)getTargetDataPointer(ImageRGB);
 
-	synthRGBDLoader.xyzi = (float4 *)getTargetDataPointer(PointXYZI);
-	synthRGBDLoader.rgba = (uchar4 *)getTargetDataPointer(PointRGBA);
-	synthRGBDLoader.intensity = (float *)getTargetDataPointer(PointIntensity);
+	synthWCLoader.xyzi = (float4 *)getTargetDataPointer(PointXYZI);
+	synthWCLoader.rgba = (uchar4 *)getTargetDataPointer(PointRGBA);
+	synthWCLoader.intensity = (float *)getTargetDataPointer(PointIntensity);
 
 	SensorInfoV2 s[n_view];
 	for(int v=0;v<n_view;v++)
@@ -218,9 +218,9 @@ void SynthRGBDBenchmarkSource::init()
 		s[v].cy = 247.6f;
 	}
 
-	synthRGBDLoader.sensorInfos = (SensorInfoV2 *)getTargetDataPointer(SensorInfoList);
+	synthWCLoader.sensorInfos = (SensorInfoV2 *)getTargetDataPointer(SensorInfoList);
 //	SensorInfoV2 *d_sinfoList = (SensorInfoV2 *)getTargetDataPointer(SensorInfoList);
-	checkCudaErrors(cudaMemcpy(synthRGBDLoader.sensorInfos,&s,n_view*sizeof(SensorInfoV2),cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy(synthWCLoader.sensorInfos,&s,n_view*sizeof(SensorInfoV2),cudaMemcpyHostToDevice));
 //	checkCudaErrors(cudaMemcpy(d_sinfoList+1,&s,1*sizeof(SensorInfoV2),cudaMemcpyHostToDevice));
 
 
@@ -230,7 +230,7 @@ void SynthRGBDBenchmarkSource::init()
 //	synthRGBDLoader.cx = 320.1f;
 //	synthRGBDLoader.cy = 247.6f;
 
-	synthRGBDLoader.transformToWorld = transform;
+	synthWCLoader.transformToWorld = transform;
 
 	block = dim3(32,24);
 	grid = dim3(640/block.x,480/block.y,n_view);
@@ -262,17 +262,22 @@ void SynthRGBDBenchmarkSource::loadFrame()
 
 	srand ( time(NULL) );
 
-	depth_lines[0] = (unsigned int) (rand() % 100);
+//	depth_lines[0] = (unsigned int) (rand() % 100);
+	depth_lines[0] = 20;
 
 	for(int i=1;i<n_view;i++)
 	{
-		depth_lines[i]= depth_lines[i-1] + (unsigned int) (rand() % 80);
+//		depth_lines[i]= depth_lines[i-1] + (unsigned int) (rand() % 80);
+		depth_lines[i]= depth_lines[i-1] + 20;
 	}
+
+
+	depth_lines[0] = 0;
+	depth_lines[1] = 20;
+	depth_lines[2] = 21;
 
 	printf("sframe: %d | tframe: %d \n",depth_lines[0],depth_lines[1]);
 
-//	depth_lines[0] = 0;
-//	depth_lines[1] = 20;
 
 	EigenCheckClass::setFrameValues(depth_lines[0],depth_lines[1]);
 
@@ -516,8 +521,8 @@ void SynthRGBDBenchmarkSource::loadFrame()
 		}
 	}
 
-	checkCudaErrors(cudaMemcpy(synthRGBDLoader.rgb,h_rgb.data(),n_view*640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
-	checkCudaErrors(cudaMemcpy(synthRGBDLoader.depth,h_depth.data(),n_view*640*480*sizeof(float),cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy(synthWCLoader.rgb,h_rgb.data(),n_view*640*480*3*sizeof(uint8_t),cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy(synthWCLoader.depth,h_depth.data(),n_view*640*480*sizeof(float),cudaMemcpyHostToDevice));
 
 
 	EigenCheckClass::getTransformationFromQuaternion(n_view,trans_quaternions,h_transformationMatrices,true);
@@ -534,14 +539,14 @@ void SynthRGBDBenchmarkSource::loadFrame()
 	}
 
 	thrust::device_vector<float> d_transformationMatrices = h_transformationMatrices;
-	synthRGBDLoader.transformationmatrices = thrust::raw_pointer_cast(d_transformationMatrices.data());
+	synthWCLoader.transformationmatrices = thrust::raw_pointer_cast(d_transformationMatrices.data());
 
 //	getTargetDataPointer(GroundTruthTransformations) =
 
-	checkCudaErrors(cudaMemcpy(getTargetDataPointer(GroundTruthTransformations),synthRGBDLoader.transformationmatrices,n_view*12*sizeof(float),cudaMemcpyDeviceToDevice));
+	checkCudaErrors(cudaMemcpy(getTargetDataPointer(GroundTruthTransformations),synthWCLoader.transformationmatrices,n_view*12*sizeof(float),cudaMemcpyDeviceToDevice));
 
 
-	device::loadSynthFrame<<<grid,block>>>(synthRGBDLoader);
+	device::loadSynthFrame<<<grid,block>>>(synthWCLoader);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -550,7 +555,7 @@ void SynthRGBDBenchmarkSource::loadFrame()
 		for(int i=0;i<n_view;i++)
 		{
 			float4 *h_f4_depth = (float4 *)malloc(640*480*sizeof(float4));
-			checkCudaErrors(cudaMemcpy(h_f4_depth,synthRGBDLoader.xyzi+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
+			checkCudaErrors(cudaMemcpy(h_f4_depth,synthWCLoader.xyzi+i*640*480,640*480*sizeof(float4),cudaMemcpyDeviceToHost));
 
 //			for(int p=0;p<640*480;p++)
 //			{

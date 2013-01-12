@@ -559,7 +559,7 @@ namespace device
 
 
 			unsigned int idx = (unsigned int)(input_src_rnd[(blockIdx.z*gridDim.x+blockIdx.x)*dx+tid]*s_length);
-			unsigned int pidx = input_src_idx_corresp[idx];
+			unsigned int pidx = input_src_idx_corresp[blockIdx.z*s_length+idx];
 			output_combinationCoresspIdx[(blockIdx.z*gridDim.x+blockIdx.x)*dx+tid] = pidx;
 			float4 tmp = input_pos[view_src*640*480+pidx];
 
@@ -1244,19 +1244,66 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-
-	//correspTest
+	if(n_view==3)
 	{
-		EigenCheckClass::setBinsPerFeatureCount(combiErrorList.bins_per_feature);
-		thrust::host_vector<unsigned int> h_s_idx = d_sIdxList;
-		thrust::host_vector<unsigned int> h_t_idx = d_corresp_idx;
+		char path[100];
+
+		int vc = 0;
+		int v0 = 0;
+		int v1 = 1;
+
+		int off0 = v0*640*480;
+		int off1 = v1*640*480;
+
 		thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(combiErrorList.input_pos);
 		thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_view*640*480);
-		thrust::device_vector<float4> h_pos = d_pos;
+		thrust::host_vector<float4> h_pos = d_pos;
 
-		EigenCheckClass::checkCorrespondancesQualityGT(h_pos,h_s_idx,s,h_t_idx,combiErrorList.corresp_list_length,25.f);
+		uchar4 *img = (uchar4 *)malloc(640*480*2*sizeof(uchar4));
+		for(int p=0;p<640*480;p++)
+		{
+			float4 tmpf4 = h_pos[off0+p];
+			unsigned char g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
+			img[p] = make_uchar4(g,g,g,128);
 
+			tmpf4 = h_pos[off1+p];
+			g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
+			img[640*480+p] = make_uchar4(g,g,g,128);
+		}
+
+		thrust::host_vector<unsigned int> h_sidx = d_sIdxList;
+		thrust::host_vector<unsigned int> h_corresp_idx = d_corresp_idx;
+		uchar4 tuc4 = make_uchar4(255,0,0,128);
+		for(int i=0;i<s;i++)
+		{
+			unsigned int pos_idx = h_sidx[vc*s+i];
+
+			img[pos_idx] = tuc4;
+
+			for(int k=0;k<correspondanceList.corresp_list_length;k++)
+			{
+				unsigned int coresp_pos_idx = h_corresp_idx[vc*s*correspondanceList.corresp_list_length+k*s+i];
+				img[640*480+coresp_pos_idx] = tuc4;
+			}
+		}
+
+		sprintf(path,"/home/avo/pcds/correspImgsingeleCorrespTest%d.ppm",vc);
+		sdkSavePPM4ub(path,(unsigned char*)img,640,480*2);
 	}
+
+
+	//correspTest
+//	{
+//		EigenCheckClass::setBinsPerFeatureCount(combiErrorList.bins_per_feature);
+//		thrust::host_vector<unsigned int> h_s_idx = d_sIdxList;
+//		thrust::host_vector<unsigned int> h_t_idx = d_corresp_idx;
+//		thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(combiErrorList.input_pos);
+//		thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_view*640*480);
+//		thrust::device_vector<float4> h_pos = d_pos;
+//
+//		EigenCheckClass::checkCorrespondancesQualityGT(h_pos,h_s_idx,s,h_t_idx,combiErrorList.corresp_list_length,25.f);
+//
+//	}
 //	thrust::host_vector<float> h_corresp_prob = d_corresp_prob;
 //	thrust::host_vector<float> h_corresp_prob = d_corresp_prob;
 //	thrust::host_vector<unsigned int> h_cooresp_idx = d_corresp_idx;
@@ -1329,6 +1376,9 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	unsigned int n_out = 14;
 //	if(outputlevel>2)
 //	{
+	if(outputlevel>2)
+	{
+		printf("corresp output enabled! \n");
 		thrust::host_vector<float> h_combiError = d_combiError;
 //		for(int i=0;i<20;i++)
 //		{
@@ -1345,19 +1395,26 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 
 		thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(combiErrorList.input_pos);
 		thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_view*640*480);
+		thrust::host_vector<float4> h_pos = d_pos;
 
-		thrust::device_vector<float4> h_pos = d_pos;
 		thrust::host_vector<unsigned int> h_combiError_correspListIdx = d_combiError_correspListIdx;
 
-		EigenCheckClass::checkCorrespondancesSetQualityGT(h_pos,h_combiErrorIdx,h_combiError_correspListIdx,128,combiErrorList.n_corresp,view_combinations*errorListLength*combiErrorList.n_corresp,0);
-
+//		EigenCheckClass::checkCorrespondancesSetQualityGT(h_pos,h_combiErrorIdx,h_combiError_correspListIdx,128,combiErrorList.n_corresp,view_combinations*errorListLength*combiErrorList.n_corresp,0);
 
 	//	thrust::host_vector<float> tm(12);
 //		EigenCheckClass::setGroundTruthTransformation(tm);
 
-		if(outputlevel>2)
+		if(outputlevel>2 && n_view==3)
 		{
 		char path[100];
+
+		int vc = 0;
+		int v0 = 0;
+		int v1 = 1;
+
+		int off0 = v0*640*480;
+		int off1 = v1*640*480;
+
 
 		uchar4 *img = (uchar4 *)malloc(640*480*2*sizeof(uchar4));
 		bool output = outputlevel > 3;
@@ -1365,22 +1422,22 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 		{
 			for(int p=0;p<640*480 && output;p++)
 			{
-				float4 tmpf4 = h_pos[p];
+				float4 tmpf4 = h_pos[off0+p];
 				unsigned char g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
 				img[p] = make_uchar4(g,g,g,128);
 
-				tmpf4 = h_pos[640*480+p];
+				tmpf4 = h_pos[off1+p];
 				g = (unsigned int) ((tmpf4.z/10000.f)*255.f);
 				img[640*480+p] = make_uchar4(g,g,g,128);
 			}
 
-			unsigned int idx_corresp = h_combiErrorIdx.data()[i];
+			unsigned int idx_corresp = h_combiErrorIdx.data()[vc*errorListLength+i];
 	//		printf("%d: \n",idx_corresp);
 			idx_corresp *= combiErrorList.n_corresp;
 			for(int c=0;c<combiErrorList.n_corresp;c++)
 			{
-				unsigned int pos_idx = h_combiError_correspListIdx.data()[idx_corresp+c];
-				float4 tmpf4 = h_pos.data()[pos_idx];
+				unsigned int pos_idx = h_combiError_correspListIdx.data()[vc*errorListLength*combiErrorList.n_corresp + idx_corresp+c];
+				float4 tmpf4 = h_pos.data()[off0+pos_idx];
 				printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
 
 				if(output)
@@ -1404,8 +1461,8 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 
 			for(int c=0;c<combiErrorList.n_corresp;c++)
 			{
-				unsigned int pos_idx = h_combiError_correspListIdx.data()[view_combinations*errorListLength*combiErrorList.n_corresp+idx_corresp+c];
-				float4 tmpf4 = h_pos.data()[640*480+pos_idx];
+				unsigned int pos_idx = h_combiError_correspListIdx.data()[view_combinations*errorListLength*combiErrorList.n_corresp+vc*errorListLength*combiErrorList.n_corresp+idx_corresp+c];
+				float4 tmpf4 = h_pos.data()[off1+pos_idx];
 				printf("%d->(%f/%f/%f) | ",pos_idx,tmpf4.x,tmpf4.y,tmpf4.z);
 
 				if(output)
@@ -1431,11 +1488,11 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 
 			if(output)
 			{
-				sprintf(path,"/home/avo/pcds/corresp/correspImg_%d_%f.ppm",i,h_combiError.data()[i]);
+				sprintf(path,"/home/avo/pcds/corresp/correspImgMulti%d_%d.ppm",vc,i);
 				sdkSavePPM4ub(path,(unsigned char*)img,640,480*2);
 			}
 		}
-
+		}
 	}
 	thrust::device_vector<int> d_validTransforms(errorListLength*view_combinations);
 	thrust::device_vector<float> d_transformMatrices(errorListLength*view_combinations*12);
@@ -1593,7 +1650,7 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 		thrust::device_vector<float> d_transEnd(dptr_transformMatrices,dptr_transformMatrices+rn*view_combinations*12);
 		thrust::host_vector<float> h_transEnd = d_transEnd;
 
-		int vc = 0;
+		int vc = 2;
 //		for(vc=0;vc<view_combinations;vc++)
 		{
 			for(int i=0;i<15;i++)

@@ -21,6 +21,9 @@
 #include "../debug/EigenCheckClass.h"
 
 #include "TranformationValidator.h"
+#include "../sink/pcd_io.h"
+
+#include <time.h>
 
 #ifndef MAXVIEWS
 #define MAXVIEWS 8
@@ -49,8 +52,8 @@ namespace device
 			dx = 32,
 			dy = 32,
 
-			dbx = 0,
-			dby = 0,
+			dbx = 10,
+			dby = 10,
 			dbtid = 0,
 
 			tx = 32,
@@ -182,20 +185,30 @@ namespace device
 //						int iy = (int) (((pos_m.y*120.f)/(0.2084f*pos_m.z))+240);
 
 
-						int ix = (int) ((pos_m.x*sinfo[view_target].fx)/pos_m.z + sinfo[view_target].cx);
-						int iy = (int) ((pos_m.y*sinfo[view_target].fy)/pos_m.z + sinfo[view_target].cy);
+						int ix = (int) ((pos_m.x*sinfo[0].fx)/pos_m.z + sinfo[0].cx);
+						int iy = (int) ((pos_m.y*sinfo[0].fy)/pos_m.z + sinfo[0].cy);
 
 	//						if(blockIdx.x==dbx && blockIdx.y==dby && tid == dbtid && i==0)
 	//							printf("%d %d -> %d %d | %f \n",cx,cy,cx,cy);
 	//
 
+//						if(blockIdx.z==2 && blockIdx.x==dbx && blockIdx.y==dby)
+//							printf("(%d) -> %f %f %f -> %d / %d \n",view_src*640*480+iy*640+ix,pos_m.x,pos_m.y,pos_m.z,ix,iy);
+
 						if(ix>=0 && ix<640 && iy>=0 && iy<480)
 						{
+
 							float4 pos_d = coords[view_target*640*480+iy*640+ix];
 							float4 n_d = normals[view_target*640*480+iy*640+ix];
+//
+//							if(blockIdx.z==2 && blockIdx.x==dbx && blockIdx.y==dby)
+//								printf("%d:(%d) -> %f %f %f -> %d / %d \n",view_target,view_target*640*480+iy*640+ix,pos_d.x,pos_d.y,pos_d.z,ix,iy);
 
 							if( pos_d.z != 0 && !isReconstructed(pos_d.w) && (!ForgroundOnly || isForeground(pos_d.w)) )
 							{
+//								if(blockIdx.z==2 && blockIdx.x==dbx && blockIdx.y==dby)
+//									printf("in!! \n");
+
 	//								continue;
 
 								float3 dv = make_float3(pos_m.x-pos_d.x,pos_m.y-pos_d.y,pos_m.z-pos_d.z);
@@ -331,7 +344,7 @@ namespace device
 //							output_errorTable[(blockIdx.z*n_rsac+soff+i)*gridDim.y*gridDim.x + blockIdx.y*gridDim.x+blockIdx.x] = soff + i;
 						}
 
-//						if(blockIdx.x==dbx && blockIdx.y==dby && i==0 && tid==dbtid)
+//						if(blockIdx.z==2 && blockIdx.x==dbx && blockIdx.y==dby && i==0 && tid==dbtid && threadIdx.x==0 && threadIdx.y==0)
 //							printf("(%d) block_sum: %f block_point_sum: %d \n",i,shm_error_buffer[0],shm_valid_points_buffer[0]);
 
 					}
@@ -657,6 +670,7 @@ void TranformationValidator::execute()
 	transformationErrorestimator.output_errorListIdx = thrust::raw_pointer_cast(d_errorListIdx.data());
 
 
+	transformationErrorestimator.n_view = n_views;
 	transformationErrorestimator.n_rsac = n_rsac;
 	transformationErrorestimator.dist_threshold = 50.f;
 	transformationErrorestimator.angle_threshold = cos(M_PI/4);
@@ -755,44 +769,98 @@ void TranformationValidator::execute()
 		float *h_tmp4 = (float *)malloc(load4*sizeof(float));
 		checkCudaErrors( cudaMemcpy(h_tmp4,errorListMinimumPicker256.output_minimumErrorTransformationMatrices,load4*sizeof(float),cudaMemcpyDeviceToHost));
 
+		thrust::host_vector<float> h_minTransformError = d_minTransformError;
+
+
+
 		printf("final transformation: \n");
-		for(int i=0;i<12;i++)
-		{
-			printf("%f | ",h_tmp4[i]);
-		}
-		printf("\n");
-	//	printf("min_error: %f \n",h_tmp4[12]);
-	}
-
-
-	thrust::host_vector<float> h_minTransformError = d_minTransformError;
-	float minTransformError = h_minTransformError[0];
-//	printf("minTransformError: %f \n",minTransformError);
-	EigenCheckClass::setMinTransformError(minTransformError);
-
-	thrust::device_ptr<float> dptr_finalTransform = thrust::device_pointer_cast(errorListMinimumPicker256.output_minimumErrorTransformationMatrices);
-	thrust::device_vector<float> d_finalTransformations(dptr_finalTransform,dptr_finalTransform+12*view_combinations);
-	thrust::device_vector<float> h_finalTransformations = d_finalTransformations;
-
-	EigenCheckClass::checkTransformationQuality(h_finalTransformations);
-
-//	float *data = h_finalTransformations.data();
-	if(outputlevel>1)
-	{
-		printf("minTransformError: %f \n",minTransformError);
-		printf("size: %d \n",h_finalTransformations.size());
 		for(int v=0;v<view_combinations;v++)
 		{
-			printf("v: %d --> ",v);
 			for(int i=0;i<12;i++)
 			{
-	//			printf("%f | ",data[v*12+i]);
-				printf("%f | ",(float)h_finalTransformations[v*12+i]);
+				printf("%f | ",h_tmp4[v*12+i]);
 			}
-			printf("\n");
+			printf("minTransformError: %f \n",h_minTransformError[v]);
 		}
+
+
+
+
+
+
+	//	printf("min_error: %f \n",h_tmp4[12]);
+
+//		thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(transformationErrorestimator.coords);
+//		thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_views*640*480);
+//		thrust::host_vector<float4> h_pos = d_pos;
+//
+//		int o = 2;
+//
+//		for(int i=0;i<o;i++)
+//		{
+//			for(int p=0;p<i*640*480;p++)
+//			{
+//				float4 t = h_pos[p];
+//				float4 o = make_float4(0,0,0,0);
+//				if(device::isForeground(t.w) && !device::isReconstructed(t.w))
+//				{
+//					o.x = h_tmp4[i*12+0]*t.x + h_tmp4[i*12+1]*t.y + h_tmp4[i*12+2]*t.z + h_tmp4[i*12+9];
+//					o.y = h_tmp4[i*12+3]*t.x + h_tmp4[i*12+4]*t.y + h_tmp4[i*12+5]*t.z + h_tmp4[i*12+10];
+//					o.z = h_tmp4[i*12+6]*t.x + h_tmp4[i*12+7]*t.y + h_tmp4[i*12+8]*t.z + h_tmp4[i*12+11];
+//				}
+//				h_pos[p] = o;
+//			}
+//		}
+//
+//		for(int p=0;p<640*480;p++)
+//		{
+//			float4 t = h_pos[o*640*480+p];
+//			if(device::isForeground(t.w) && !device::isReconstructed(t.w))
+//				h_pos[o*640*480+p] = t;
+//			else
+//				h_pos[o*640*480+p] = make_float4(0,0,0,0);
+//		}
+//
+//
+//		time_t rawtime;
+//		time ( &rawtime );
+//
+//		char path[50];
+//		for(int i=0;i<o+1;i++)
+//		{
+//			sprintf(path,"/home/avo/pcds/mintransformed_%d.pcd",i);
+//			host::io::PCDIOController pcdIOCtrl;
+//			float4 *f4p = h_pos.data();
+//			pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
+//		}
 	}
-	printf("transformationValidation done! \n");
+
+
+//	EigenCheckClass::setMinTransformError(minTransformError);
+//
+//	thrust::device_ptr<float> dptr_finalTransform = thrust::device_pointer_cast(errorListMinimumPicker256.output_minimumErrorTransformationMatrices);
+//	thrust::device_vector<float> d_finalTransformations(dptr_finalTransform,dptr_finalTransform+12*view_combinations);
+//	thrust::device_vector<float> h_finalTransformations = d_finalTransformations;
+//
+//	EigenCheckClass::checkTransformationQuality(h_finalTransformations);
+//
+////	float *data = h_finalTransformations.data();
+//	if(outputlevel>1)
+//	{
+//		printf("minTransformError: %f \n",minTransformError);
+//		printf("size: %d \n",h_finalTransformations.size());
+//		for(int v=0;v<view_combinations;v++)
+//		{
+//			printf("v: %d --> ",v);
+//			for(int i=0;i<12;i++)
+//			{
+//	//			printf("%f | ",data[v*12+i]);
+//				printf("%f | ",(float)h_finalTransformations[v*12+i]);
+//			}
+//			printf("\n");
+//		}
+//	}
+//	printf("transformationValidation done! \n");
 }
 
 TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int n_rsac,unsigned int outputlevel)

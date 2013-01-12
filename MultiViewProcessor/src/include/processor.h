@@ -90,7 +90,7 @@ private:
 		{
 			DeviceDataInfoPtr ddip = memList[i];
 			DeviceDataParams params = ddip->getDeviceDataParams();
-			printf("i:%d | elements: %d | element_size: %d \n",i,params.elements,params.element_size);
+//			printf("i:%d | elements: %d | element_size: %d \n",i,params.elements,params.element_size);
 
 			void* d;
 

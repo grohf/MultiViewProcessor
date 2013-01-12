@@ -741,6 +741,9 @@ EigenCheckClass::getTransformationFromQuaternion(unsigned int n_view,thrust::hos
 //		tranformmatrices[v*12+9] 	= re_v_out[0]*1000.f;
 //		tranformmatrices[v*12+10] 	= re_v_out[1]*1000.f;
 //		tranformmatrices[v*12+11] 	= re_v_out[2]*1000.f;
+
+		Eigen::Vector3f re_t = - r_out * v_out;
+		std::cout << "re_t :\n" << re_t << std::endl;
 	}
 
 	GT_transformation = tranformmatrices;
