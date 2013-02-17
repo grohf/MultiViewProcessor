@@ -74,6 +74,18 @@ public:
 		addFilter(filter->getFilterPtr());
 	}
 
+	static bool contRun;
+	static bool contTry;
+
+	static void breakRun()
+	{
+		contRun = false;
+	}
+
+	static void breakTry()
+	{
+		contTry = false;
+	}
 
 private:
 

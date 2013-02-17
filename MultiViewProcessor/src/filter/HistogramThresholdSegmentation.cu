@@ -232,6 +232,7 @@ HistogramThresholdSegmentation::execute()
 			old_tresh = unary_op.thresh;
 			result = thrust::transform_reduce(d_pos.data()+v*640*480, d_pos.data()+(v+1)*640*480,unary_op, init, binary_op);
 			unary_op.thresh = result.threshold();
+			unary_op.thresh = result.threshold_var();
 //	//        printf("round: %d \n",c++,result.threshold());
 //			std::cout <<"n1              : "<< result.n1 << std::endl;
 //			std::cout <<"n2             : "<< result.n2 << std::endl;

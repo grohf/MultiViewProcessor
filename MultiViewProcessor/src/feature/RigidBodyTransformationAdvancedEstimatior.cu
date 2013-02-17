@@ -1248,9 +1248,9 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 	{
 		char path[100];
 
-		int vc = 0;
-		int v0 = 0;
-		int v1 = 1;
+		int vc = 2;
+		int v0 = 1;
+		int v1 = 2;
 
 		int off0 = v0*640*480;
 		int off1 = v1*640*480;
@@ -1408,9 +1408,9 @@ RigidBodyTransformationAdvancedEstimatior::execute()
 		{
 		char path[100];
 
-		int vc = 0;
-		int v0 = 0;
-		int v1 = 1;
+		int vc = 2;
+		int v0 = 1;
+		int v1 = 2;
 
 		int off0 = v0*640*480;
 		int off1 = v1*640*480;

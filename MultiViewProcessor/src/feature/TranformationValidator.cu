@@ -19,6 +19,7 @@
 #include "point_info.hpp"
 #include "utils.hpp"
 #include "../debug/EigenCheckClass.h"
+#include "../include/processor.h"
 
 #include "TranformationValidator.h"
 #include "../sink/pcd_io.h"
@@ -772,6 +773,10 @@ void TranformationValidator::execute()
 		thrust::host_vector<float> h_minTransformError = d_minTransformError;
 
 
+		float maxErr = -1.f;
+		int maxV = -1;
+		int inValidTransCount = 0;
+		float maxSimError = 500.f;
 
 		printf("final transformation: \n");
 		for(int v=0;v<view_combinations;v++)
@@ -781,10 +786,320 @@ void TranformationValidator::execute()
 				printf("%f | ",h_tmp4[v*12+i]);
 			}
 			printf("minTransformError: %f \n",h_minTransformError[v]);
+
+			if(h_minTransformError[v]>maxErr)
+			{
+				maxErr = h_minTransformError[v];
+				maxV = v;
+			}
+
+			if(h_minTransformError[v]>maxSimError)
+			{
+				inValidTransCount++;
+			}
+		}
+		printf("maxTransV: %d \n",maxV);
+		printf("invalidCount: %d \n",inValidTransCount);
+
+		if(n_views == 3 && inValidTransCount<2)
+		{
+			thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(transformationErrorestimator.coords);
+			thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_views*640*480);
+			thrust::host_vector<float4> h_pos = d_pos;
+			thrust::host_vector<float4> h_pos_tmp = d_pos;
+			thrust::host_vector<float> h_tmpTrans(12);
+
+			int i = 0;
+			int t = 1;
+			switch (maxV) {
+				case 0:
+					printf("case %d \n",1);
+					i = 0;
+					t = 1;
+
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						float4 o = make_float4(0,0,0,0);
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						{
+							o.x = h_tmp4[t*12+0]*pt.x + h_tmp4[t*12+1]*pt.y + h_tmp4[t*12+2]*pt.z + h_tmp4[t*12+9];
+							o.y = h_tmp4[t*12+3]*pt.x + h_tmp4[t*12+4]*pt.y + h_tmp4[t*12+5]*pt.z + h_tmp4[t*12+10];
+							o.z = h_tmp4[t*12+6]*pt.x + h_tmp4[t*12+7]*pt.y + h_tmp4[t*12+8]*pt.z + h_tmp4[t*12+11];
+						}
+						h_pos[i*640*480+p] = o;
+					}
+
+					i = 1;
+					t = 2;
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						float4 o = make_float4(0,0,0,0);
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						{
+							o.x = h_tmp4[t*12+0]*pt.x + h_tmp4[t*12+1]*pt.y + h_tmp4[t*12+2]*pt.z + h_tmp4[t*12+9];
+							o.y = h_tmp4[t*12+3]*pt.x + h_tmp4[t*12+4]*pt.y + h_tmp4[t*12+5]*pt.z + h_tmp4[t*12+10];
+							o.z = h_tmp4[t*12+6]*pt.x + h_tmp4[t*12+7]*pt.y + h_tmp4[t*12+8]*pt.z + h_tmp4[t*12+11];
+						}
+						h_pos[i*640*480+p] = o;
+					}
+
+					i = 2;
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+							h_pos[i*640*480+p] = pt;
+						else
+							h_pos[i*640*480+p] = make_float4(0,0,0,0);
+					}
+					break;
+
+				case 1:
+					printf("case %d \n",1);
+					i = 0;
+					t = 0;
+
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						float4 o = make_float4(0,0,0,0);
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						{
+							o.x = h_tmp4[t*12+0]*pt.x + h_tmp4[t*12+1]*pt.y + h_tmp4[t*12+2]*pt.z + h_tmp4[t*12+9];
+							o.y = h_tmp4[t*12+3]*pt.x + h_tmp4[t*12+4]*pt.y + h_tmp4[t*12+5]*pt.z + h_tmp4[t*12+10];
+							o.z = h_tmp4[t*12+6]*pt.x + h_tmp4[t*12+7]*pt.y + h_tmp4[t*12+8]*pt.z + h_tmp4[t*12+11];
+						}
+						h_pos[i*640*480+p] = o;
+					}
+
+
+
+					i = 2;
+					t = 2;
+
+					h_tmpTrans[0] = h_tmp4[t*12+0];
+					h_tmpTrans[1] = h_tmp4[t*12+3];
+					h_tmpTrans[2] = h_tmp4[t*12+6];
+
+					h_tmpTrans[3] = h_tmp4[t*12+1];
+					h_tmpTrans[4] = h_tmp4[t*12+4];
+					h_tmpTrans[5] = h_tmp4[t*12+7];
+
+					h_tmpTrans[6] = h_tmp4[t*12+2];
+					h_tmpTrans[7] = h_tmp4[t*12+5];
+					h_tmpTrans[8] = h_tmp4[t*12+8];
+
+					h_tmpTrans[9] = -1.f * (h_tmpTrans[0] * h_tmp4[t*12+9] + h_tmpTrans[1] * h_tmp4[t*12+10] + h_tmpTrans[2] * h_tmp4[t*12+11]);
+					h_tmpTrans[10] = -1.f * (h_tmpTrans[3] * h_tmp4[t*12+9] + h_tmpTrans[4] * h_tmp4[t*12+10] + h_tmpTrans[5] * h_tmp4[t*12+11]);
+					h_tmpTrans[11] = -1.f * (h_tmpTrans[6] * h_tmp4[t*12+9] + h_tmpTrans[7] * h_tmp4[t*12+10] + h_tmpTrans[8] * h_tmp4[t*12+11]);
+
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						float4 o = make_float4(0,0,0,0);
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						{
+							o.x = h_tmpTrans[0]*pt.x + h_tmpTrans[1]*pt.y + h_tmpTrans[2]*pt.z + h_tmpTrans[9];
+							o.y = h_tmpTrans[3]*pt.x + h_tmpTrans[4]*pt.y + h_tmpTrans[5]*pt.z + h_tmpTrans[10];
+							o.z = h_tmpTrans[6]*pt.x + h_tmpTrans[7]*pt.y + h_tmpTrans[8]*pt.z + h_tmpTrans[11];
+						}
+						h_pos[i*640*480+p] = o;
+					}
+
+					i = 1;
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+							h_pos[i*640*480+p] = pt;
+						else
+							h_pos[i*640*480+p] = make_float4(0,0,0,0);
+					}
+
+					break;
+
+
+				case 2:
+					printf("case %d \n",1);
+
+					i = 1;
+					t = 0;
+
+					h_tmpTrans[0] = h_tmp4[t*12+0];
+					h_tmpTrans[1] = h_tmp4[t*12+3];
+					h_tmpTrans[2] = h_tmp4[t*12+6];
+
+					h_tmpTrans[3] = h_tmp4[t*12+1];
+					h_tmpTrans[4] = h_tmp4[t*12+4];
+					h_tmpTrans[5] = h_tmp4[t*12+7];
+
+					h_tmpTrans[6] = h_tmp4[t*12+2];
+					h_tmpTrans[7] = h_tmp4[t*12+5];
+					h_tmpTrans[8] = h_tmp4[t*12+8];
+
+					h_tmpTrans[9] = -1.f * (h_tmpTrans[0] * h_tmp4[t*12+9] + h_tmpTrans[1] * h_tmp4[t*12+10] + h_tmpTrans[2] * h_tmp4[t*12+11]);
+					h_tmpTrans[10] = -1.f * (h_tmpTrans[3] * h_tmp4[t*12+9] + h_tmpTrans[4] * h_tmp4[t*12+10] + h_tmpTrans[5] * h_tmp4[t*12+11]);
+					h_tmpTrans[11] = -1.f * (h_tmpTrans[6] * h_tmp4[t*12+9] + h_tmpTrans[7] * h_tmp4[t*12+10] + h_tmpTrans[8] * h_tmp4[t*12+11]);
+
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						float4 o = make_float4(0,0,0,0);
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						{
+							o.x = h_tmpTrans[0]*pt.x + h_tmpTrans[1]*pt.y + h_tmpTrans[2]*pt.z + h_tmpTrans[9];
+							o.y = h_tmpTrans[3]*pt.x + h_tmpTrans[4]*pt.y + h_tmpTrans[5]*pt.z + h_tmpTrans[10];
+							o.z = h_tmpTrans[6]*pt.x + h_tmpTrans[7]*pt.y + h_tmpTrans[8]*pt.z + h_tmpTrans[11];
+						}
+						h_pos[i*640*480+p] = o;
+					}
+
+					i = 2;
+					t = 1;
+
+					h_tmpTrans[0] = h_tmp4[t*12+0];
+					h_tmpTrans[1] = h_tmp4[t*12+3];
+					h_tmpTrans[2] = h_tmp4[t*12+6];
+
+					h_tmpTrans[3] = h_tmp4[t*12+1];
+					h_tmpTrans[4] = h_tmp4[t*12+4];
+					h_tmpTrans[5] = h_tmp4[t*12+7];
+
+					h_tmpTrans[6] = h_tmp4[t*12+2];
+					h_tmpTrans[7] = h_tmp4[t*12+5];
+					h_tmpTrans[8] = h_tmp4[t*12+8];
+
+					h_tmpTrans[9] = -1.f * (h_tmpTrans[0] * h_tmp4[t*12+9] + h_tmpTrans[1] * h_tmp4[t*12+10] + h_tmpTrans[2] * h_tmp4[t*12+11]);
+					h_tmpTrans[10] = -1.f * (h_tmpTrans[3] * h_tmp4[t*12+9] + h_tmpTrans[4] * h_tmp4[t*12+10] + h_tmpTrans[5] * h_tmp4[t*12+11]);
+					h_tmpTrans[11] = -1.f * (h_tmpTrans[6] * h_tmp4[t*12+9] + h_tmpTrans[7] * h_tmp4[t*12+10] + h_tmpTrans[8] * h_tmp4[t*12+11]);
+
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						float4 o = make_float4(0,0,0,0);
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						{
+							o.x = h_tmpTrans[0]*pt.x + h_tmpTrans[1]*pt.y + h_tmpTrans[2]*pt.z + h_tmpTrans[9];
+							o.y = h_tmpTrans[3]*pt.x + h_tmpTrans[4]*pt.y + h_tmpTrans[5]*pt.z + h_tmpTrans[10];
+							o.z = h_tmpTrans[6]*pt.x + h_tmpTrans[7]*pt.y + h_tmpTrans[8]*pt.z + h_tmpTrans[11];
+						}
+						h_pos[i*640*480+p] = o;
+					}
+
+					i = 0;
+					for(int p=0;p<640*480;p++)
+					{
+						float4 pt = h_pos[i*640*480+p];
+						if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+							h_pos[i*640*480+p] = pt;
+						else
+							h_pos[i*640*480+p] = make_float4(0,0,0,0);
+					}
+
+					break;
+
+				default:
+					printf("Dam shit! \n");
+					break;
+			}
+
+			char path[100];
+			for(int i=0;i<3;i++)
+			{
+				sprintf(path,"/home/avo/pcds/mt/mintransformed_%d.pcd",i);
+				host::io::PCDIOController pcdIOCtrl;
+				float4 *f4p = h_pos.data();
+				pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
+			}
+
+
+			for(int i=0;i<3;i++)
+			{
+				for(int p=0;p<640*480;p++)
+				{
+					float4 pt = h_pos_tmp[i*640*480+p];
+					if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+						h_pos_tmp[i*640*480+p] = pt;
+					else
+						h_pos_tmp[i*640*480+p] = make_float4(0,0,0,0);
+				}
+
+				sprintf(path,"/home/avo/pcds/mt/untransformed_%d.pcd",i);
+				host::io::PCDIOController pcdIOCtrl;
+				float4 *f4p = h_pos_tmp.data();
+				pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
+			}
+
+			Processor::breakRun();
+			printf("breakRun! \n");
 		}
 
 
+		/*
+		float sum = 0.f;
+		int ca = 2;
+		if(ca==2 && n_views==3)
+		{
+			thrust::device_ptr<float4> pos_ptr = thrust::device_pointer_cast(transformationErrorestimator.coords);
+			thrust::device_vector<float4> d_pos(pos_ptr,pos_ptr+n_views*640*480);
+			thrust::host_vector<float4> h_pos = d_pos;
 
+			int i = 0;
+			int t = 1;
+			sum += h_minTransformError[1]/100000.f;
+			for(int p=0;p<640*480;p++)
+			{
+				float4 pt = h_pos[i*640*480+p];
+				float4 o = make_float4(0,0,0,0);
+				if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+				{
+					o.x = h_tmp4[t*12+0]*pt.x + h_tmp4[t*12+1]*pt.y + h_tmp4[t*12+2]*pt.z + h_tmp4[t*12+9];
+					o.y = h_tmp4[t*12+3]*pt.x + h_tmp4[t*12+4]*pt.y + h_tmp4[t*12+5]*pt.z + h_tmp4[t*12+10];
+					o.z = h_tmp4[t*12+6]*pt.x + h_tmp4[t*12+7]*pt.y + h_tmp4[t*12+8]*pt.z + h_tmp4[t*12+11];
+				}
+				h_pos[i*640*480+p] = o;
+			}
+
+			i = 1;
+			t = 2;
+			sum += h_minTransformError[2]/100000.f;
+			for(int p=0;p<640*480;p++)
+			{
+				float4 pt = h_pos[i*640*480+p];
+				float4 o = make_float4(0,0,0,0);
+				if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+				{
+					o.x = h_tmp4[t*12+0]*pt.x + h_tmp4[t*12+1]*pt.y + h_tmp4[t*12+2]*pt.z + h_tmp4[t*12+9];
+					o.y = h_tmp4[t*12+3]*pt.x + h_tmp4[t*12+4]*pt.y + h_tmp4[t*12+5]*pt.z + h_tmp4[t*12+10];
+					o.z = h_tmp4[t*12+6]*pt.x + h_tmp4[t*12+7]*pt.y + h_tmp4[t*12+8]*pt.z + h_tmp4[t*12+11];
+				}
+				h_pos[i*640*480+p] = o;
+			}
+
+			i = 2;
+			for(int p=0;p<640*480;p++)
+			{
+				float4 pt = h_pos[i*640*480+p];
+				if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+					h_pos[i*640*480+p] = pt;
+				else
+					h_pos[i*640*480+p] = make_float4(0,0,0,0);
+			}
+
+
+			char path[100];
+			for(int i=0;i<3;i++)
+			{
+				sprintf(path,"/home/avo/pcds/mt/mintransformed_%d.pcd",i);
+				host::io::PCDIOController pcdIOCtrl;
+				float4 *f4p = h_pos.data();
+				pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
+			}
+
+		}
+*/
 
 
 
@@ -861,6 +1176,8 @@ void TranformationValidator::execute()
 //		}
 //	}
 //	printf("transformationValidation done! \n");
+
+//	Processor::breakRun();
 }
 
 TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int n_rsac,unsigned int outputlevel)

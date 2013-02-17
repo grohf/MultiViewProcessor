@@ -14,11 +14,15 @@
 #include "processor.h"
 
 
+bool Processor::contRun;
+bool Processor::contTry;
+
 Processor::Processor()
 {
 
 //	findCudaGLDevice(0,(const char**)"");
-
+	contRun = true;
+	contTry = true;
 }
 
 
@@ -42,11 +46,15 @@ void Processor::start()
 		enhancerPtrList[i]->init();
 	}
 
-	/* EXECUTES */
-	srcPtr->execute();
-	for(int i=0;i<enhancerPtrList.size();i++)
+	for(int l=0;l<25 && contRun;l++)
+//	while(contRun)
 	{
-		enhancerPtrList[i]->execute();
+		/* EXECUTES */
+		srcPtr->execute();
+		for(int i=0;i<enhancerPtrList.size()&&contTry;i++)
+		{
+			enhancerPtrList[i]->execute();
+		}
 	}
 }
 

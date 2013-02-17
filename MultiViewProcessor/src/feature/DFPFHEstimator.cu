@@ -20,6 +20,7 @@
 #include <thrust/device_vector.h>
 
 #include "point_info.hpp"
+#include "../include/processor.h"
 
 
 #include "../sink/pcd_io.h"
@@ -1017,12 +1018,12 @@ DFPFHEstimator::execute()
 	thrust::device_vector<float> d_dfpfh2(n_view*640*480*sdpfh2.bins_n_meta);
 
 	dfpfh1.radius = radii[0];
-	dfpfh1.maxReconstructuionLevel = 0;
+	dfpfh1.maxReconstructuionLevel = 1;
 	dfpfh1.input_bins_sdfpfh = sdpfh1.output_bins;
 	dfpfh1.output_bins = thrust::raw_pointer_cast(d_dfpfh1.data());
 
 	dfpfh2.radius = radii[1];
-	dfpfh2.maxReconstructuionLevel = 0;
+	dfpfh2.maxReconstructuionLevel = 1;
 	dfpfh2.input_bins_sdfpfh = sdpfh2.output_bins;
 	dfpfh2.output_bins = thrust::raw_pointer_cast(d_dfpfh2.data());
 
@@ -1274,17 +1275,25 @@ DFPFHEstimator::execute()
 	thrust::device_ptr<unsigned int> idxLength_ptr = thrust::device_pointer_cast((unsigned int *)getTargetDataPointer(PDFPFHIdxLength));
 	thrust::copy(d_persistanceMapLength.data(),d_persistanceMapLength.data()+n_view,idxLength_ptr);
 
+//	bool cont = true;
 
 	if(outputlevel>1)
 	{
 		printf("length: %d -> %d \n",d_persistance_map.size(),persistanceMapLength);
-		thrust::host_vector<unsigned int> h_persistanceMapLength = d_persistanceMapLength;
-		for(int l=0;l<h_persistanceMapLength.size();l++)
-		{
-			int length = h_persistanceMapLength.data()[l];
-			printf("%d -> %d \n",l,length);
-		}
+	}
 
+
+	thrust::host_vector<unsigned int> h_persistanceMapLength = d_persistanceMapLength;
+	for(int l=0;l<h_persistanceMapLength.size();l++)
+	{
+		int length = h_persistanceMapLength.data()[l];
+		if(length==0) Processor::breakTry();
+		if(outputlevel>1) printf("%d -> %d \n",l,length);
+	}
+
+
+	if(outputlevel>1)
+	{
 		thrust::host_vector<int> h_clearedPersiatnceMap = d_persistance_map;
 		int *dataLength = h_clearedPersiatnceMap.data();
 		int lidx = h_persistanceMapLength.data()[0];

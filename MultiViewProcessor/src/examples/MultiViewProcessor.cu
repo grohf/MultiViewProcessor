@@ -298,10 +298,10 @@ void RealInput()
 {
 	unsigned int nv = 3;
 		Processor p;
-		OpenNISource *src = new OpenNISource(nv,2);
+		OpenNISource *src = new OpenNISource(nv,0);
 		p.setSource(SourcePtr(src));
 
-		ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,5);
+		ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,0);
 		atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 		atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 		atrousfilter->setPointIntensity(src->getIntensity());
@@ -317,19 +317,19 @@ void RealInput()
 //	}
 //	else
 //	{
-		TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(nv,500.f,1800.00f);
+		TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(nv,500.f,2000.00f);
 		truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 		p.addFilter(truncateThresholdFilter);
 //	}
 
 
 
-		NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,2);
+		NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,0);
 		nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
 		p.addFeature(nPCAestimator);
 
 
-		DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,2);
+		DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,0);
 		dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 		dfpfhEstimator->setNormals(nPCAestimator->getNormals());
 		p.addFeature(dfpfhEstimator);
@@ -337,7 +337,7 @@ void RealInput()
 
 
 		unsigned n_ransac = 128;
-		RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,4);
+		RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,0);
 		transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 		transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
 		transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
@@ -363,24 +363,24 @@ void TestSynthInput2(char *fpath)
 	p.setSource(SourcePtr(src));
 
 
-	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,0);
+	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,5);
 	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 	atrousfilter->setPointIntensity(src->getIntensity());
 	p.addFilter(atrousfilter);
 
-if(scene==0)
+//if(scene==0)
 {
 	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,3);
 	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	p.addFilter(seg);
 }
-else
-{
-	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,500.f,3500.00f);
-	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
-	p.addFilter(truncateThresholdFilter);
-}
+//else
+//{
+//	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,500.f,3500.00f);
+//	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
+//	p.addFilter(truncateThresholdFilter);
+//}
 
 	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,5);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());

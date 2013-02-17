@@ -267,14 +267,14 @@ void SynthRGBDBenchmarkSource::loadFrame()
 
 	for(int i=1;i<n_view;i++)
 	{
-//		depth_lines[i]= depth_lines[i-1] + (unsigned int) (rand() % 80);
-		depth_lines[i]= depth_lines[i-1] + 20;
+		depth_lines[i]= depth_lines[i-1] + (unsigned int) (rand() % 80);
+//		depth_lines[i]= depth_lines[i-1] + 20;
 	}
 
 
 	depth_lines[0] = 0;
 	depth_lines[1] = 20;
-	depth_lines[2] = 21;
+	depth_lines[2] = 40;
 
 	printf("sframe: %d | tframe: %d \n",depth_lines[0],depth_lines[1]);
 
