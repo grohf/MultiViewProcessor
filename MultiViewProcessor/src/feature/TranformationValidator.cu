@@ -1015,22 +1015,22 @@ void TranformationValidator::execute()
 			}
 
 
-			for(int i=0;i<3;i++)
-			{
-				for(int p=0;p<640*480;p++)
-				{
-					float4 pt = h_pos_tmp[i*640*480+p];
-					if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
-						h_pos_tmp[i*640*480+p] = pt;
-					else
-						h_pos_tmp[i*640*480+p] = make_float4(0,0,0,0);
-				}
-
-				sprintf(path,"/home/avo/pcds/mt/untransformed_%d.pcd",i);
-				host::io::PCDIOController pcdIOCtrl;
-				float4 *f4p = h_pos_tmp.data();
-				pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
-			}
+//			for(int i=0;i<3;i++)
+//			{
+//				for(int p=0;p<640*480;p++)
+//				{
+//					float4 pt = h_pos_tmp[i*640*480+p];
+//					if(device::isForeground(pt.w) && !device::isReconstructed(pt.w))
+//						h_pos_tmp[i*640*480+p] = pt;
+//					else
+//						h_pos_tmp[i*640*480+p] = make_float4(0,0,0,0);
+//				}
+//
+//				sprintf(path,"/home/avo/pcds/mt/untransformed_%d.pcd",i);
+//				host::io::PCDIOController pcdIOCtrl;
+//				float4 *f4p = h_pos_tmp.data();
+//				pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
+//			}
 
 			Processor::breakRun();
 			printf("breakRun! \n");

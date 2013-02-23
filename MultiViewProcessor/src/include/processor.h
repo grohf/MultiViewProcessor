@@ -27,12 +27,20 @@ class Processor
 {
 
 SourcePtr srcPtr;
-std::vector<EnhancerPtr> enhancerPtrList;
+std::vector<EnhancerPtr> alignmentPtrList;
+std::vector<EnhancerPtr> viewPtrList;
 
 
 std::vector<DeviceDataInfoPtr> memList;
 
 public:
+
+	enum Mode
+	{
+		Alignment,
+		View,
+		All,
+	};
 
 	Processor();
 
@@ -51,7 +59,7 @@ public:
 	void addFilter(FilterPtr filterPtr)
 	{
 		EnhancerPtr ePtr = filterPtr;
-		enhancerPtrList.push_back(ePtr);
+		alignmentPtrList.push_back(ePtr);
 
 		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
 	}
@@ -59,7 +67,7 @@ public:
 	void addFeature(FeaturePtr featurePtr)
 	{
 		EnhancerPtr ePtr = featurePtr;
-		enhancerPtrList.push_back(ePtr);
+		alignmentPtrList.push_back(ePtr);
 
 		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
 	}
@@ -74,8 +82,54 @@ public:
 		addFilter(filter->getFilterPtr());
 	}
 
+
+
+
+	/* Mode */
+
+
+	void addFilter(FilterPtr filterPtr, Mode m)
+	{
+		EnhancerPtr ePtr = filterPtr;
+		if(m == Alignment || m == All)
+			alignmentPtrList.push_back(ePtr);
+
+		if(m == View || m == All)
+			viewPtrList.push_back(ePtr);
+
+		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
+	}
+
+	void addFeature(FeaturePtr featurePtr, Mode m)
+	{
+		EnhancerPtr ePtr = featurePtr;
+		if(m == Alignment || m == All)
+			alignmentPtrList.push_back(ePtr);
+
+		if(m == View || m == All)
+			viewPtrList.push_back(ePtr);
+
+		addRequestedDeviceData(ePtr->getRequestedDeviceDataInfoPtrList());
+	}
+
+	void addFeature(Feature *feature,Mode m)
+	{
+		addFeature(feature->getFeaturePtr(),m);
+	}
+
+	void addFilter(Filter *filter,Mode m)
+	{
+		addFilter(filter->getFilterPtr(),m);
+	}
+
 	static bool contRun;
 	static bool contTry;
+	static bool isAligned;
+
+	static void doneAlignment()
+	{
+		isAligned = true;
+	}
 
 	static void breakRun()
 	{

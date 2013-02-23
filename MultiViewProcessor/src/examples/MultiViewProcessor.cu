@@ -305,7 +305,7 @@ void RealInput()
 		atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 		atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 		atrousfilter->setPointIntensity(src->getIntensity());
-		p.addFilter(atrousfilter);
+		p.addFilter(atrousfilter,Processor::All);
 
 
 
@@ -319,20 +319,20 @@ void RealInput()
 //	{
 		TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(nv,500.f,2000.00f);
 		truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
-		p.addFilter(truncateThresholdFilter);
+		p.addFilter(truncateThresholdFilter,Processor::All);
 //	}
 
 
 
 		NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,0);
 		nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
-		p.addFeature(nPCAestimator);
+		p.addFeature(nPCAestimator,Processor::Alignment);
 
 
 		DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,0);
 		dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 		dfpfhEstimator->setNormals(nPCAestimator->getNormals());
-		p.addFeature(dfpfhEstimator);
+		p.addFeature(dfpfhEstimator,Processor::Alignment);
 
 
 
@@ -342,14 +342,16 @@ void RealInput()
 		transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
 		transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
 		transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
-		p.addFeature(transform);
+		p.addFeature(transform,Processor::Alignment);
 
 		TranformationValidator *validator = new TranformationValidator(nv,n_ransac,2);
 		validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
 		validator->setNormals(nPCAestimator->getNormals());
 		validator->setSensorInfoList(src->getSensorV2InfoList());
 		validator->setTransformationmatrices(transform->getTransformationMatrices());
-		p.addFeature(validator);
+		p.addFeature(validator,Processor::Alignment);
+
+
 
 		p.start();
 }

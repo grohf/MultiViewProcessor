@@ -16,6 +16,7 @@
 
 bool Processor::contRun;
 bool Processor::contTry;
+bool Processor::isAligned;
 
 Processor::Processor()
 {
@@ -23,6 +24,8 @@ Processor::Processor()
 //	findCudaGLDevice(0,(const char**)"");
 	contRun = true;
 	contTry = true;
+
+	isAligned = false;
 }
 
 
@@ -30,7 +33,7 @@ void Processor::addFilter(Filter& filter)
 {
 	Enhancer *enh = &filter;
 	EnhancerPtr ePtr(enh);
-	enhancerPtrList.push_back(ePtr);
+	alignmentPtrList.push_back(ePtr);
 }
 
 void Processor::start()
@@ -41,9 +44,9 @@ void Processor::start()
 
 	/* INITS */
 	srcPtr->init();
-	for(int i=0;i<enhancerPtrList.size();i++)
+	for(int i=0;i<alignmentPtrList.size();i++)
 	{
-		enhancerPtrList[i]->init();
+		alignmentPtrList[i]->init();
 	}
 
 	for(int l=0;l<25 && contRun;l++)
@@ -51,9 +54,9 @@ void Processor::start()
 	{
 		/* EXECUTES */
 		srcPtr->execute();
-		for(int i=0;i<enhancerPtrList.size()&&contTry;i++)
+		for(int i=0;i<alignmentPtrList.size()&&contTry;i++)
 		{
-			enhancerPtrList[i]->execute();
+			alignmentPtrList[i]->execute();
 		}
 	}
 }
