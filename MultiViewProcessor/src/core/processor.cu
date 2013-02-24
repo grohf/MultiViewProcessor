@@ -18,13 +18,24 @@ bool Processor::contRun;
 bool Processor::contTry;
 bool Processor::isAligned;
 
-Processor::Processor()
+Processor::Processor() : maxAlignFrames(1),captureingFrames(1)
 {
 
 //	findCudaGLDevice(0,(const char**)"");
-	contRun = true;
-	contTry = true;
+//	contRun = true;
+//	contTry = true;
+//
+	isAligned = false;
 
+}
+
+Processor::Processor(unsigned int maxAlignFrames) : maxAlignFrames(maxAlignFrames),captureingFrames(1)
+{
+	isAligned = false;
+}
+
+Processor::Processor(unsigned int maxAlignFrames, unsigned int captureingFrames) : maxAlignFrames(maxAlignFrames),captureingFrames(captureingFrames)
+{
 	isAligned = false;
 }
 
@@ -44,20 +55,45 @@ void Processor::start()
 
 	/* INITS */
 	srcPtr->init();
-	for(int i=0;i<alignmentPtrList.size();i++)
+	for(int i=0;i<allPtrList.size();i++)
 	{
-		alignmentPtrList[i]->init();
+		allPtrList[i]->init();
 	}
 
-	for(int l=0;l<25 && contRun;l++)
-//	while(contRun)
+	printf("maxAlignFrames: %d | captureingFrames: %d \n",maxAlignFrames,captureingFrames);
+
+//	for(int l=0;l<25 && contRun;l++)
+////	while(contRun)
+//	{
+//		/* EXECUTES */
+//		srcPtr->execute();
+//		for(int i=0;i<alignmentPtrList.size()&&contTry;i++)
+//		{
+//			alignmentPtrList[i]->execute();
+//		}
+//	}
+
+	for(int f=0;f<maxAlignFrames && !isAligned;f++)
 	{
-		/* EXECUTES */
+		/* EXECUTES ALIGNMENT*/
 		srcPtr->execute();
-		for(int i=0;i<alignmentPtrList.size()&&contTry;i++)
+		for(int i=0;i<alignmentPtrList.size();i++)
 		{
 			alignmentPtrList[i]->execute();
 		}
 	}
+
+	for(int f=0;f<captureingFrames && isAligned;f++)
+	{
+		printf("cp: %d/%d \n",f,captureingFrames);
+		/* EXECUTES VIEW*/
+		srcPtr->execute();
+		for(int i=0;i<viewPtrList.size();i++)
+		{
+			viewPtrList[i]->execute();
+		}
+	}
+
+
 }
 

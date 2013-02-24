@@ -31,6 +31,8 @@ class TranformationValidator : public Feature {
 		ValidPointsTable,
 		ErrorList,
 		ErrorListIndices,
+
+		BestTransformMatrices,
 	};
 
 	dim3 grid;
@@ -95,6 +97,11 @@ public:
 	DeviceDataInfoPtr getMinimumErrorTransformation()
 	{
 		return getTargetData(MinimumErrorTransformationMatrices);
+	}
+
+	DeviceDataInfoPtr getBestTransformations()
+	{
+		return getTargetData(BestTransformMatrices);
 	}
 
 

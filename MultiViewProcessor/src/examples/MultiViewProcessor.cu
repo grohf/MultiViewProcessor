@@ -42,6 +42,7 @@
 #include "../feature/TranformationValidator.h"
 #include "../feature/SimpleNormalEstimator.h"
 #include "../feature/GlobalFineRegistrationEstimator.h"
+#include "../filter/Integrator.h"
 
 #include "../include/point_info.hpp"
 
@@ -297,16 +298,15 @@ void TestGlobalFineRegistration()
 void RealInput()
 {
 	unsigned int nv = 3;
-		Processor p;
+		Processor p(25,60);
 		OpenNISource *src = new OpenNISource(nv,0);
 		p.setSource(SourcePtr(src));
 
-		ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,0);
+		ATrousFilter *atrousfilter = new ATrousFilter(nv,2,15,5,0);
 		atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 		atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 		atrousfilter->setPointIntensity(src->getIntensity());
 		p.addFilter(atrousfilter,Processor::All);
-
 
 
 //	if(scene==0)
@@ -352,63 +352,83 @@ void RealInput()
 		p.addFeature(validator,Processor::Alignment);
 
 
+//		ATrousFilter *atrousfilter2 = new ATrousFilter(nv,1,15,5,0);
+//		atrousfilter2->setInput2DPointCloud(src->getWorldCoordinates());
+//		atrousfilter2->setInputSensorInfo(src->getSensorV2InfoList());
+//		atrousfilter2->setPointIntensity(src->getIntensity());
+//		p.addFilter(atrousfilter2,Processor::View);
+
+		Integrator *integrator = new Integrator(nv);
+		integrator->setPosition(atrousfilter->getFilteredWorldCoordinates());
+		integrator->setMinTransformations(validator->getBestTransformations());
+		p.addFilter(integrator,Processor::View);
 
 		p.start();
+
+		integrator->flush();
 }
 
 void TestSynthInput2(char *fpath)
 {
 	unsigned int scene = 0;
 	unsigned int nv = 3;
-	Processor p;
+	unsigned int outlvl = 5;
+	Processor p(5,1);
 	SynthRGBDBenchmarkSource *src = new SynthRGBDBenchmarkSource(nv,scene,false,false);
 	p.setSource(SourcePtr(src));
 
 
-	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,5);
+	ATrousFilter *atrousfilter = new ATrousFilter(nv,2,20,5,outlvl);
 	atrousfilter->setInput2DPointCloud(src->getWorldCoordinates());
 	atrousfilter->setInputSensorInfo(src->getSensorV2InfoList());
 	atrousfilter->setPointIntensity(src->getIntensity());
-	p.addFilter(atrousfilter);
+	p.addFilter(atrousfilter,Processor::All);
 
 //if(scene==0)
 {
-	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,3);
+	HistogramThresholdSegmentation *seg = new HistogramThresholdSegmentation(nv,outlvl);
 	seg->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
-	p.addFilter(seg);
+	p.addFilter(seg,Processor::All);
 }
 //else
 //{
 //	TruncateThresholdFilter *truncateThresholdFilter = new TruncateThresholdFilter(2,500.f,3500.00f);
 //	truncateThresholdFilter->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
-//	p.addFilter(truncateThresholdFilter);
+//	p.addFilter(truncateThresholdFilter,Processor::All);
 //}
 
-	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,5);
+	NormalPCAEstimator *nPCAestimator = new NormalPCAEstimator(nv,20,outlvl);
 	nPCAestimator->setWorldCoordinates(atrousfilter->getFilteredWorldCoordinates());
-	p.addFeature(nPCAestimator);
+	p.addFeature(nPCAestimator,Processor::Alignment);
 
-	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,5);
+	DFPFHEstimator *dfpfhEstimator = new DFPFHEstimator(nv,outlvl);
 	dfpfhEstimator->setPointCoordinates(atrousfilter->getFilteredWorldCoordinates());
 	dfpfhEstimator->setNormals(nPCAestimator->getNormals());
-	p.addFeature(dfpfhEstimator);
+	p.addFeature(dfpfhEstimator,Processor::Alignment);
 
 	unsigned n_ransac = 128;
-	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,5);
+	RigidBodyTransformationAdvancedEstimatior *transform = new RigidBodyTransformationAdvancedEstimatior(nv,n_ransac,2048,32,outlvl);
 	transform->setCoordinatesMap(atrousfilter->getFilteredWorldCoordinates());
 	transform->setPersistanceHistogramMap(dfpfhEstimator->getDFPFH());
 	transform->setPersistanceIndexList(dfpfhEstimator->getPersistanceIndexList());
 	transform->setPersistenceInfoList(dfpfhEstimator->getPersistenceInfoList());
-	p.addFeature(transform);
+	p.addFeature(transform,Processor::Alignment);
 
-	TranformationValidator *validator = new TranformationValidator(nv,n_ransac,3);
+	TranformationValidator *validator = new TranformationValidator(nv,n_ransac,5);
 	validator->setWorldCooordinates(atrousfilter->getFilteredWorldCoordinates());
 	validator->setNormals(nPCAestimator->getNormals());
 	validator->setSensorInfoList(src->getSensorV2InfoList());
 	validator->setTransformationmatrices(transform->getTransformationMatrices());
-	p.addFeature(validator);
+	p.addFeature(validator,Processor::Alignment);
+
+	Integrator *integrator = new Integrator(nv);
+	integrator->setPosition(atrousfilter->getFilteredWorldCoordinates());
+	integrator->setMinTransformations(validator->getBestTransformations());
+	p.addFilter(integrator,Processor::View);
 
 	p.start();
+
+	integrator->flush();
 
 //	char cvsPath[100];
 //	sprintf(cvsPath,"%s%s","/home/avo/Desktop/",fpath);

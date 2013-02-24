@@ -776,7 +776,7 @@ void TranformationValidator::execute()
 		float maxErr = -1.f;
 		int maxV = -1;
 		int inValidTransCount = 0;
-		float maxSimError = 500.f;
+		float maxSimError = 200.f;
 
 		printf("final transformation: \n");
 		for(int v=0;v<view_combinations;v++)
@@ -808,6 +808,7 @@ void TranformationValidator::execute()
 			thrust::host_vector<float4> h_pos = d_pos;
 			thrust::host_vector<float4> h_pos_tmp = d_pos;
 			thrust::host_vector<float> h_tmpTrans(12);
+			thrust::host_vector<float> h_bestTrans(n_views*12);
 
 			int i = 0;
 			int t = 1;
@@ -829,6 +830,8 @@ void TranformationValidator::execute()
 						}
 						h_pos[i*640*480+p] = o;
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = h_tmp4[t*12+tt];
 
 					i = 1;
 					t = 2;
@@ -844,6 +847,9 @@ void TranformationValidator::execute()
 						}
 						h_pos[i*640*480+p] = o;
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = h_tmp4[t*12+tt];
+
 
 					i = 2;
 					for(int p=0;p<640*480;p++)
@@ -854,6 +860,12 @@ void TranformationValidator::execute()
 						else
 							h_pos[i*640*480+p] = make_float4(0,0,0,0);
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = 0;
+					h_bestTrans[i*12+0] = 1;
+					h_bestTrans[i*12+4] = 1;
+					h_bestTrans[i*12+8] = 1;
+
 					break;
 
 				case 1:
@@ -873,6 +885,8 @@ void TranformationValidator::execute()
 						}
 						h_pos[i*640*480+p] = o;
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = h_tmp4[t*12+tt];
 
 
 
@@ -907,6 +921,9 @@ void TranformationValidator::execute()
 						}
 						h_pos[i*640*480+p] = o;
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = h_tmpTrans[tt];
+
 
 					i = 1;
 					for(int p=0;p<640*480;p++)
@@ -917,6 +934,12 @@ void TranformationValidator::execute()
 						else
 							h_pos[i*640*480+p] = make_float4(0,0,0,0);
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = 0;
+					h_bestTrans[i*12+0] = 1;
+					h_bestTrans[i*12+4] = 1;
+					h_bestTrans[i*12+8] = 1;
+
 
 					break;
 
@@ -955,6 +978,9 @@ void TranformationValidator::execute()
 						}
 						h_pos[i*640*480+p] = o;
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = h_tmpTrans[tt];
+
 
 					i = 2;
 					t = 1;
@@ -987,6 +1013,9 @@ void TranformationValidator::execute()
 						}
 						h_pos[i*640*480+p] = o;
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = h_tmpTrans[tt];
+
 
 					i = 0;
 					for(int p=0;p<640*480;p++)
@@ -997,6 +1026,12 @@ void TranformationValidator::execute()
 						else
 							h_pos[i*640*480+p] = make_float4(0,0,0,0);
 					}
+					for(int tt=0;tt<12;tt++)
+						h_bestTrans[i*12+tt] = 0;
+					h_bestTrans[i*12+0] = 1;
+					h_bestTrans[i*12+4] = 1;
+					h_bestTrans[i*12+8] = 1;
+
 
 					break;
 
@@ -1004,6 +1039,8 @@ void TranformationValidator::execute()
 					printf("Dam shit! \n");
 					break;
 			}
+
+			checkCudaErrors( cudaMemcpy(getTargetDataPointer(BestTransformMatrices),h_bestTrans.data(),n_views*12*sizeof(float),cudaMemcpyHostToDevice));
 
 			char path[100];
 			for(int i=0;i<3;i++)
@@ -1032,8 +1069,9 @@ void TranformationValidator::execute()
 //				pcdIOCtrl.writeASCIIPCD(path,(float *)(f4p + i*640*480),640*480);
 //			}
 
-			Processor::breakRun();
-			printf("breakRun! \n");
+//			Processor::breakRun();
+			Processor::setAligned();
+			printf("aligned! \n");
 		}
 
 
@@ -1245,6 +1283,12 @@ TranformationValidator::TranformationValidator(unsigned int n_views,unsigned int
 	minErrorTransformationMatricesParams.dataType = Matrix;
 	addTargetData(addDeviceDataRequest(minErrorTransformationMatricesParams),MinimumErrorTransformationMatrices);
 
+	DeviceDataParams bestTransformationMatrices;
+	bestTransformationMatrices.elements = n_views;
+	bestTransformationMatrices.element_size = 12 * sizeof(float);
+	bestTransformationMatrices.elementType = FLOAT1;
+	bestTransformationMatrices.dataType = Matrix;
+	addTargetData(addDeviceDataRequest(bestTransformationMatrices),BestTransformMatrices);
 
 
 //	for(int i=0;i<(n_views*(n_views-1))/2;i++)

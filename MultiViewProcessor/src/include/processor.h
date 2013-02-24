@@ -29,6 +29,7 @@ class Processor
 SourcePtr srcPtr;
 std::vector<EnhancerPtr> alignmentPtrList;
 std::vector<EnhancerPtr> viewPtrList;
+std::vector<EnhancerPtr> allPtrList;
 
 
 std::vector<DeviceDataInfoPtr> memList;
@@ -43,6 +44,11 @@ public:
 	};
 
 	Processor();
+
+	unsigned int maxAlignFrames;
+	unsigned int captureingFrames;
+	Processor(unsigned int maxAlignFrames);
+	Processor(unsigned int maxAlignFrames, unsigned int captureingFrames);
 
 //	void setSource(Source& source);
 	void addFilter(Filter& filter);
@@ -91,6 +97,8 @@ public:
 	void addFilter(FilterPtr filterPtr, Mode m)
 	{
 		EnhancerPtr ePtr = filterPtr;
+		allPtrList.push_back(ePtr);
+
 		if(m == Alignment || m == All)
 			alignmentPtrList.push_back(ePtr);
 
@@ -103,6 +111,8 @@ public:
 	void addFeature(FeaturePtr featurePtr, Mode m)
 	{
 		EnhancerPtr ePtr = featurePtr;
+		allPtrList.push_back(ePtr);
+
 		if(m == Alignment || m == All)
 			alignmentPtrList.push_back(ePtr);
 
@@ -126,7 +136,7 @@ public:
 	static bool contTry;
 	static bool isAligned;
 
-	static void doneAlignment()
+	static void setAligned()
 	{
 		isAligned = true;
 	}

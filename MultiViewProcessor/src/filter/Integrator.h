@@ -20,7 +20,7 @@ class Integrator : public Filter {
 
 	enum Target
 	{
-		TransformPositions,
+//		TransformPositions,
 	};
 
 	unsigned int n_view;
@@ -28,7 +28,7 @@ class Integrator : public Filter {
 public:
 
 
-	Integrator();
+	Integrator(unsigned int n_view);
 	virtual ~Integrator();
 
 	void init();
@@ -36,7 +36,8 @@ public:
 
 	void setPosition(DeviceDataInfoPtr ddiPtr)
 	{
-		addFilterInput(ddiPtr,Positions);
+//		addFilterInput(ddiPtr,Positions);
+		addInputData(ddiPtr,Positions);
 	}
 
 	void setMinTransformations(DeviceDataInfoPtr ddiPtr)
@@ -48,6 +49,8 @@ public:
 //	{
 //		return getTargetData(TransformPositions);
 //	}
+
+	void flush();
 
 };
 
